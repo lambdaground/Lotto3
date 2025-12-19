@@ -39,28 +39,27 @@ export function NumberPicker({
         <p className="text-sm text-muted-foreground">
           {t("selectUpTo5")} ({t("selected")}: {selectedNumbers.length}/5)
         </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClear}
-            disabled={selectedNumbers.length === 0 || disabled}
-            data-testid="button-clear-selection"
-          >
-            <RotateCcw className="w-4 h-4 mr-1" />
-            {t("clearAll")}
-          </Button>
-          <Button
-            size="sm"
-            onClick={onAutoFill}
-            disabled={disabled}
-            data-testid="button-auto-fill"
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            {t("autoFill")}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onClear}
+          disabled={selectedNumbers.length === 0 || disabled}
+          data-testid="button-clear-selection"
+        >
+          <RotateCcw className="w-4 h-4 mr-1" />
+          {t("clearAll")}
+        </Button>
       </div>
+
+      <Button
+        className="w-full h-12 text-lg font-semibold"
+        onClick={onAutoFill}
+        disabled={disabled}
+        data-testid="button-auto-fill"
+      >
+        <Sparkles className="w-5 h-5 mr-2" />
+        {t("generateNumbers")}
+      </Button>
 
       <div className="grid grid-cols-5 md:grid-cols-9 gap-2">
         {numbers.map((num) => {
