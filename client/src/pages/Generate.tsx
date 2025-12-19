@@ -168,15 +168,6 @@ export default function Generate() {
                 <LottoBalls numbers={quickNumbers} size="lg" />
               </div>
             )}
-
-            <div className="mt-6 p-4 bg-muted rounded-lg">
-              <h3 className="font-medium mb-2">{t("history")}</h3>
-              <p className="text-sm text-muted-foreground">
-                {quickNumbers.length === 0 && generatedNumbers.length === 0
-                  ? t("noData")
-                  : `${[...new Set([...quickNumbers, ...generatedNumbers])].length} ${t("numbers")} generated`}
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
