@@ -126,57 +126,106 @@ function filterDrawsByPeriod(
   });
 }
 
-function generateStatisticalNumbers(selectedNumbers: number[] = []): number[] {
-  const stats = calculateStatistics(lottoData);
-  const { hotNumbers, topPairs } = stats;
-
-  const preferredNumbers = new Map<number, number>();
-
-  // Prioritize selected numbers
-  selectedNumbers.forEach(num => preferredNumbers.set(num, (preferredNumbers.get(num) || 0) + 100));
-
-  // Add hot numbers, giving them a boost
-  hotNumbers.forEach(hn => {
-    if (!selectedNumbers.includes(hn.number)) {
-      preferredNumbers.set(hn.number, (preferredNumbers.get(hn.number) || 0) + (hn.count || 0));
-    }
-  });
-
-  // Add numbers from top pairs, also giving them a boost
-  topPairs.forEach(tp => {
-    tp.pair.forEach(num => {
-      if (!selectedNumbers.includes(num) && !hotNumbers.some(hn => hn.number === num)) {
-        preferredNumbers.set(num, (preferredNumbers.get(num) || 0) + (tp.count || 0) / 2);
-      }
-    });
-  });
-
-  // Convert map to an array of numbers, sorted by preference score
-  const sortedNumbers = Array.from(preferredNumbers.entries())
-    .sort(([, countA], [, countB]) => countB - countA)
-    .map(([num]) => num);
-
-  const generatedNumbers: number[] = [...selectedNumbers];
-
-  // Fill remaining slots, prioritizing numbers from the sorted list
-  while (generatedNumbers.length < 6) {
-    let found = false;
-    for (const num of sortedNumbers) {
-      if (!generatedNumbers.includes(num)) {
-        generatedNumbers.push(num);
-        found = true;
-        break;
-      }
-    }
-    // If we run out of preferred numbers, fill with random ones
-    if (!found) {
-      const randomNum = Math.floor(Math.random() * 45) + 1;
-      if (!generatedNumbers.includes(randomNum)) {
-        generatedNumbers.push(randomNum);
+function getPairScores(selectedNumbers: number[]): Map<number, number> {
+  const pairScores = new Map<number, number>();
+  
+  for (const draw of lottoData) {
+    const nums = draw.numbers;
+    for (const selected of selectedNumbers) {
+      if (nums.includes(selected)) {
+        for (const num of nums) {
+          if (!selectedNumbers.includes(num)) {
+            pairScores.set(num, (pairScores.get(num) || 0) + 1);
+          }
+        }
       }
     }
   }
+  
+  return pairScores;
+}
 
+function getIndividualPairScores(num: number): Map<number, number> {
+  const scores = new Map<number, number>();
+  for (const draw of lottoData) {
+    if (draw.numbers.includes(num)) {
+      for (const n of draw.numbers) {
+        if (n !== num) {
+          scores.set(n, (scores.get(n) || 0) + 1);
+        }
+      }
+    }
+  }
+  return scores;
+}
+
+function selectBestNumbersForPairing(selectedNumbers: number[]): number[] {
+  const numberScores: { num: number; totalScore: number }[] = [];
+  
+  for (const num of selectedNumbers) {
+    const pairScores = getIndividualPairScores(num);
+    let totalScore = 0;
+    for (const [, score] of pairScores) {
+      totalScore += score;
+    }
+    numberScores.push({ num, totalScore });
+  }
+  
+  numberScores.sort((a, b) => b.totalScore - a.totalScore);
+  
+  if (selectedNumbers.length === 4) {
+    return numberScores.slice(0, 2).map(n => n.num);
+  } else {
+    return numberScores.slice(0, 2).map(n => n.num);
+  }
+}
+
+function generateStatisticalNumbers(selectedNumbers: number[] = []): number[] {
+  const selectedCount = selectedNumbers.length;
+  const generatedNumbers: number[] = [...selectedNumbers];
+  
+  if (selectedCount === 0) {
+    const stats = calculateStatistics(lottoData);
+    const hotNums = stats.hotNumbers.slice(0, 6).map(h => h.number);
+    return hotNums.sort((a, b) => a - b);
+  }
+  
+  let numbersForPairing: number[];
+  let statisticalSlots: number;
+  
+  if (selectedCount <= 2) {
+    numbersForPairing = selectedNumbers;
+    statisticalSlots = 2;
+  } else if (selectedCount === 3) {
+    numbersForPairing = selectedNumbers;
+    statisticalSlots = 3;
+  } else {
+    numbersForPairing = selectBestNumbersForPairing(selectedNumbers);
+    statisticalSlots = 6 - selectedCount;
+  }
+  
+  const pairScores = getPairScores(numbersForPairing);
+  const sortedByPair = Array.from(pairScores.entries())
+    .filter(([num]) => !selectedNumbers.includes(num))
+    .sort(([, a], [, b]) => b - a)
+    .map(([num]) => num);
+  
+  let addedStatistical = 0;
+  for (const num of sortedByPair) {
+    if (addedStatistical >= statisticalSlots) break;
+    if (!generatedNumbers.includes(num)) {
+      generatedNumbers.push(num);
+      addedStatistical++;
+    }
+  }
+  
+  while (generatedNumbers.length < 6) {
+    const randomNum = Math.floor(Math.random() * 45) + 1;
+    if (!generatedNumbers.includes(randomNum)) {
+      generatedNumbers.push(randomNum);
+    }
+  }
+  
   return generatedNumbers.sort((a, b) => a - b);
 }
 
