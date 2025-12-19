@@ -126,6 +126,60 @@ function filterDrawsByPeriod(
   });
 }
 
+function generateStatisticalNumbers(selectedNumbers: number[] = []): number[] {
+  const stats = calculateStatistics(lottoData);
+  const { hotNumbers, topPairs } = stats;
+
+  const preferredNumbers = new Map<number, number>();
+
+  // Prioritize selected numbers
+  selectedNumbers.forEach(num => preferredNumbers.set(num, (preferredNumbers.get(num) || 0) + 100));
+
+  // Add hot numbers, giving them a boost
+  hotNumbers.forEach(hn => {
+    if (!selectedNumbers.includes(hn.number)) {
+      preferredNumbers.set(hn.number, (preferredNumbers.get(hn.number) || 0) + (hn.count || 0));
+    }
+  });
+
+  // Add numbers from top pairs, also giving them a boost
+  topPairs.forEach(tp => {
+    tp.pair.forEach(num => {
+      if (!selectedNumbers.includes(num) && !hotNumbers.some(hn => hn.number === num)) {
+        preferredNumbers.set(num, (preferredNumbers.get(num) || 0) + (tp.count || 0) / 2);
+      }
+    });
+  });
+
+  // Convert map to an array of numbers, sorted by preference score
+  const sortedNumbers = Array.from(preferredNumbers.entries())
+    .sort(([, countA], [, countB]) => countB - countA)
+    .map(([num]) => num);
+
+  const generatedNumbers: number[] = [...selectedNumbers];
+
+  // Fill remaining slots, prioritizing numbers from the sorted list
+  while (generatedNumbers.length < 6) {
+    let found = false;
+    for (const num of sortedNumbers) {
+      if (!generatedNumbers.includes(num)) {
+        generatedNumbers.push(num);
+        found = true;
+        break;
+      }
+    }
+    // If we run out of preferred numbers, fill with random ones
+    if (!found) {
+      const randomNum = Math.floor(Math.random() * 45) + 1;
+      if (!generatedNumbers.includes(randomNum)) {
+        generatedNumbers.push(randomNum);
+      }
+    }
+  }
+
+  return generatedNumbers.sort((a, b) => a - b);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -174,7 +228,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/lotto/generate", (req, res) => {
-    const { selectedNumbers = [] } = req.body;
+    const { selectedNumbers = [], useStatistical = false } = req.body;
 
     if (!Array.isArray(selectedNumbers)) {
       return res.status(400).json({ error: "selectedNumbers must be an array" });
@@ -191,7 +245,9 @@ export async function registerRoutes(
     }
 
     const uniqueSelected = [...new Set(selectedNumbers)];
-    const numbers = generateRandomNumbers(uniqueSelected);
+    const numbers = useStatistical 
+      ? generateStatisticalNumbers(uniqueSelected)
+      : generateRandomNumbers(uniqueSelected);
 
     res.json({ numbers });
   });
