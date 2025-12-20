@@ -1,9 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import fs from "fs";
+import { storage } from "./storage";;
 import path from "path";
-
-import { storage } from "./storage.js";
+import fs from "fs";
 
 interface LottoDraw {
   drawNo: number;
