@@ -2,6 +2,9 @@
   "include": ["src/**/*", "shared/**/*", "server/**/*", "api"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
+    /* 여기에 target을 명시해서 해결합니다 */
+    "target": "ES2020",
+
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "noEmit": true,
@@ -14,7 +17,9 @@
     "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
     "baseUrl": ".",
-    "types": ["node", "vite/"],
+    "types": ["node", "vite/client"], 
+    /* types에 'vite/' 대신 'vite/client'를 명시하는 것이 더 정확합니다 */
+    
     "paths": {
       "@/*": ["./src/*"],
       "@shared/*": ["./shared/*"]
