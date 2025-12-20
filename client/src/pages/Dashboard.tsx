@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LottoBalls } from "@/components/LottoBall";
+import { StoreMap } from "@/components/StoreMap";
 import { useLanguage } from "@/lib/i18n";
 import type { LottoDraw, Statistics } from "@shared/schema";
 import { useState } from "react";
@@ -197,6 +198,8 @@ export default function Dashboard() {
           </Link>
         </CardContent>
       </Card>
+
+      <StoreMap />
     </div>
   );
 }

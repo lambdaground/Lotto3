@@ -306,6 +306,60 @@ export const translations: Translations = {
     zh: "次",
     ja: "回",
   },
+  lottoStores: {
+    ko: "로또 명당",
+    en: "Lucky Stores",
+    zh: "幸运店铺",
+    ja: "当選店舗",
+  },
+  nearbyStores: {
+    ko: "근처 매장",
+    en: "Nearby Stores",
+    zh: "附近店铺",
+    ja: "近くの店舗",
+  },
+  findNearby: {
+    ko: "내 주변 찾기",
+    en: "Find Nearby",
+    zh: "查找附近",
+    ja: "近くを探す",
+  },
+  topStores: {
+    ko: "전국 1등 당첨 명당",
+    en: "Top Winning Stores",
+    zh: "全国顶级中奖店",
+    ja: "全国1等当選店舗",
+  },
+  distanceKm: {
+    ko: "km",
+    en: "km",
+    zh: "公里",
+    ja: "km",
+  },
+  viewOnMap: {
+    ko: "지도에서 보기",
+    en: "View on Map",
+    zh: "在地图上查看",
+    ja: "地図で見る",
+  },
+  locationPermission: {
+    ko: "위치 권한이 필요합니다",
+    en: "Location permission required",
+    zh: "需要位置权限",
+    ja: "位置情報の許可が必要です",
+  },
+  gettingLocation: {
+    ko: "위치 확인 중...",
+    en: "Getting location...",
+    zh: "获取位置中...",
+    ja: "位置を取得中...",
+  },
+  wins: {
+    ko: "당첨",
+    en: "wins",
+    zh: "中奖",
+    ja: "当選",
+  },
 };
 
 interface LanguageContextType {
