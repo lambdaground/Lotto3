@@ -5,7 +5,7 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
-// 1. 기본 설정
+// 기본 설정
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -15,7 +15,7 @@ declare module "http" {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// 2. 로그 함수
+// 로그 함수
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -26,7 +26,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-// 3. 로깅 미들웨어
+// 로깅 미들웨어
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -51,31 +51,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// 4. 에러 핸들러 세팅 함수 (라우트 등록 후 실행되어야 함)
-const setupErrorHandler = () => {
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    throw err;
-  });
-};
-
-// ⭐️ 5. 핵심 수정: Top-level await 제거
-// 이전 코드에서 파일 맨 아래에 있던 await registerRoutes(...)를 삭제했습니다.
-// 대신 아래 setupApp 함수 안에서만 실행되도록 변경했습니다.
-
+// ⭐️ 핵심: 에러가 나던 Top-level await 코드를 제거하고
+// setupApp 함수 안으로 안전하게 옮김
 let routesRegistered = false;
 
 export async function setupApp() {
-  // 이미 등록되었다면 중복 실행 방지
   if (!routesRegistered) {
-    
-    // 여기서 await를 사용합니다 (함수 내부이므로 안전함)
+    // registerRoutes가 여기서 실행됩니다 (안전함)
     await registerRoutes(httpServer, app);
     
-    // 라우트 등록 후에 에러 핸들러 부착
-    setupErrorHandler();
+    // 에러 핸들러
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      res.status(status).json({ message });
+      throw err;
+    });
 
     routesRegistered = true;
   }
