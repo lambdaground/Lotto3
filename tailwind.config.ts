@@ -2,7 +2,10 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
+  content: [
+    "./index.html",            // client/index.html 이 아님!
+    "./src/**/*.{js,ts,jsx,tsx}" // client/src/... 가 아님!
+  ],
   theme: {
     extend: {
       borderRadius: {
@@ -83,9 +86,9 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["'Noto Sans KR'", "'Inter'", "sans-serif"],
-        serif: ["Georgia", "serif"],
-        mono: ["'JetBrains Mono'", "monospace"],
+        sans: ["var(--font-sans)"],
+        serif: ["var(--font-serif)"],
+        mono: ["var(--font-mono)"],
       },
       keyframes: {
         "accordion-down": {
