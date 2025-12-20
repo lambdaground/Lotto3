@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import fs from "fs";
 import path from "path";
 
+import { storage } from "./storage.js";
+
 interface LottoDraw {
   drawNo: number;
   date: string;
