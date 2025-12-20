@@ -1,11 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
 const httpServer = createServer(app);
 
+// 1. Vercel 환경에서 HTTP Request의 rawBody를 쓰기 위한 설정 (유지)
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -22,6 +22,7 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// 2. 로그 유틸리티 (유지하되 간단히)
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -29,10 +30,10 @@ export function log(message: string, source = "express") {
     second: "2-digit",
     hour12: true,
   });
-
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// 3. 로깅 미들웨어 (유지)
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -51,7 +52,6 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       log(logLine);
     }
   });
@@ -59,40 +59,22 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  await registerRoutes(httpServer, app);
+// 4. 핵심 변경 사항: IIFE(즉시 실행 함수) 제거 및 라우트 등록
+// registerRoutes가 비동기(async)이므로 top-level await를 사용합니다.
+// (tsconfig.json target이 ES2017 이상이면 작동합니다)
+await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+// 5. 에러 핸들러 (유지)
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+  res.status(status).json({ message });
+  throw err;
+});
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
+// 6. 중요: setupVite, serveStatic, app.listen 제거
+// Vercel은 이 파일 자체를 함수로 import해서 사용하므로
+// 직접 포트를 열면(listen) 안 되고, app을 export 해야 합니다.
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
-})();
+export default app;
