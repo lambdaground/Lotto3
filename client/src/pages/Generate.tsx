@@ -83,9 +83,9 @@ export default function Generate() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex-1">
-                <p className="text-sm font-medium">통계 기반 생성</p>
+                <p className="text-sm font-medium">{t("statisticalGeneration")}</p>
                 <p className="text-xs text-muted-foreground">
-                  선택한 번호와 자주 함께 나온 번호 우선 선택
+                  {t("statisticalGenerationDesc")}
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">

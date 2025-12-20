@@ -360,6 +360,18 @@ export const translations: Translations = {
     zh: "中奖",
     ja: "当選",
   },
+  statisticalGeneration: {
+    ko: "통계 기반 생성",
+    en: "Statistical Generation",
+    zh: "基于统计生成",
+    ja: "統計ベース生成",
+  },
+  statisticalGenerationDesc: {
+    ko: "선택한 번호와 자주 함께 나온 번호 우선 선택",
+    en: "Prioritize numbers that frequently appear with selected numbers",
+    zh: "优先选择与已选号码常一起出现的号码",
+    ja: "選択した番号とよく一緒に出る番号を優先",
+  },
 };
 
 interface LanguageContextType {
