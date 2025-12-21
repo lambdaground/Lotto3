@@ -10,7 +10,7 @@ import { useLanguage } from "@/lib/i18n";
 import type { LottoDraw, Statistics } from "@shared/schema";
 import { useState } from "react";
 // ✅ [추가 1] 회차 계산 함수 import
-import { getLatestDrwNo } from "@/lib/lotto";
+import { getLatestDrwNo } from "@/lib/lotto.js";
 
 function generateRandomNumbers(): number[] {
   const nums: number[] = [];
