@@ -9,6 +9,8 @@ import { StoreMap } from "@/components/StoreMap";
 import { useLanguage } from "@/lib/i18n";
 import type { LottoDraw, Statistics } from "@shared/schema";
 import { useState } from "react";
+// ✅ [추가 1] 회차 계산 함수 import
+import { getLatestDrwNo } from "@/lib/lotto";
 
 function generateRandomNumbers(): number[] {
   const nums: number[] = [];
@@ -23,12 +25,13 @@ export default function Dashboard() {
   const { t } = useLanguage();
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
 
+  // ✅ [수정 2] 현재 최신 회차를 계산해서 API 요청 주소에 포함시킴
+  const currentDrwNo = getLatestDrwNo();
+  
+  // 기존: queryKey: ["/api/lotto/latest"],
+  // 수정: drwNo 파라미터를 붙여서 특정 회차를 강제로 요청
   const { data: latestDraw, isLoading: loadingLatest } = useQuery<LottoDraw>({
-    queryKey: ["/api/lotto/latest"],
-  });
-
-  const { data: statistics, isLoading: loadingStats } = useQuery<Statistics>({
-    queryKey: ["/api/lotto/statistics"],
+    queryKey: [`/api/lotto/latest?drwNo=${currentDrwNo}`], 
   });
 
   const handleGenerate = () => {
