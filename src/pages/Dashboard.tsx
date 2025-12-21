@@ -33,6 +33,9 @@ export default function Dashboard() {
   const { data: latestDraw, isLoading: loadingLatest } = useQuery<LottoDraw>({
     queryKey: [`/api/lotto/latest?drwNo=${currentDrwNo}`], 
   });
+  const { data: statistics, isLoading: loadingStats } = useQuery<Statistics>({
+    queryKey: ["/api/lotto/statistics"],
+  });
 
   const handleGenerate = () => {
     setGeneratedNumbers(generateRandomNumbers());
