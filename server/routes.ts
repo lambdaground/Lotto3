@@ -1,3 +1,5 @@
+// 상단 import에 추가
+import { importLocalData } from "./importData";
 import type { Express } from "express";
 import { type Server } from "http";
 import { createClient } from "@supabase/supabase-js"; // Supabase 클라이언트 추가
@@ -250,6 +252,17 @@ export async function registerRoutes(
   
   // ✅ 1. 크론 잡 라우트 등록 (가장 중요)
   setupCronRoutes(app);
+
+  // 👇 [추가] 수동으로 JSON 파일 데이터를 DB에 넣는 주소
+  app.get("/api/setup/import", async (req, res) => {
+    // 보안을 위해 키 검사 (선택사항이지만 권장)
+    if (req.query.key !== (process.env.CRON_SECRET || "debug1234")) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    const result = await importLocalData();
+    res.json(result);
+  });
 
   // ✅ 2. 최신 로또 번호 조회 (DB 사용)
   app.get("/api/lotto/latest", async (req, res) => {
