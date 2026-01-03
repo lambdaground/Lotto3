@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Sparkles, RotateCw, Loader2 } from "lucide-react";
+import { Sparkles, RotateCw, Loader2, Flame, Snowflake, Dices } from "lucide-react"; // ✅ 아이콘 추가
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LottoBalls } from "@/components/LottoBall";
@@ -17,18 +17,25 @@ function generateRandomNumbers(exclude: number[] = []): number[] {
   return nums.sort((a, b) => a - b);
 }
 
+// ✅ 생성 모드 타입 정의
+type StatMode = "none" | "hot" | "cold";
+
 export default function Generate() {
   const { t } = useLanguage();
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
   const [quickNumbers, setQuickNumbers] = useState<number[]>([]);
-  const [useStatisticalGeneration, setUseStatisticalGeneration] = useState(false);
+  
+  // ✅ [수정 1] 단순 boolean 대신 3가지 모드 상태 관리
+  const [statMode, setStatMode] = useState<StatMode>("none");
 
   const generateMutation = useMutation({
     mutationFn: async (selected: number[]) => {
+      // ✅ [수정 2] API 요청 시 모드(hot/cold) 정보 전달
       const response = await apiRequest("POST", "/api/lotto/generate", {
         selectedNumbers: selected,
-        useStatistical: useStatisticalGeneration,
+        useStatistical: statMode !== "none", // 통계 사용 여부
+        statType: statMode === "none" ? undefined : statMode, // 'hot' 또는 'cold'
       });
       return response.json();
     },
@@ -81,22 +88,43 @@ export default function Generate() {
             <CardDescription>{t("selectUpTo5")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div className="flex-1">
-                <p className="text-sm font-medium">{t("statisticalGeneration")}</p>
-                <p className="text-xs text-muted-foreground">
-                  {t("statisticalGenerationDesc")}
-                </p>
+            
+            {/* ✅ [수정 3] 생성 방식 선택 UI (버튼 3개) */}
+            <div className="space-y-3 p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">생성 알고리즘 선택</span>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useStatisticalGeneration}
-                  onChange={(e) => setUseStatisticalGeneration(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant={statMode === "none" ? "default" : "outline"}
+                  onClick={() => setStatMode("none")}
+                  className="flex flex-col h-auto py-2 px-1 gap-1"
+                >
+                  <Dices className="w-4 h-4" />
+                  <span className="text-xs">랜덤</span>
+                </Button>
+                <Button
+                  variant={statMode === "hot" ? "default" : "outline"}
+                  onClick={() => setStatMode("hot")}
+                  className={`flex flex-col h-auto py-2 px-1 gap-1 ${statMode === "hot" ? "bg-red-500 hover:bg-red-600 border-red-500" : "hover:text-red-500 hover:border-red-500"}`}
+                >
+                  <Flame className="w-4 h-4" />
+                  <span className="text-xs">자주 나옴</span>
+                </Button>
+                <Button
+                  variant={statMode === "cold" ? "default" : "outline"}
+                  onClick={() => setStatMode("cold")}
+                  className={`flex flex-col h-auto py-2 px-1 gap-1 ${statMode === "cold" ? "bg-blue-500 hover:bg-blue-600 border-blue-500" : "hover:text-blue-500 hover:border-blue-500"}`}
+                >
+                  <Snowflake className="w-4 h-4" />
+                  <span className="text-xs">적게 나옴</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                {statMode === "none" && "순수 무작위로 번호를 생성합니다."}
+                {statMode === "hot" && "과거 당첨 이력에서 가장 많이 나온 번호 위주로 조합합니다."}
+                {statMode === "cold" && "과거 당첨 이력에서 잘 나오지 않았던 번호 위주로 조합합니다."}
+              </p>
             </div>
 
             <NumberPicker
