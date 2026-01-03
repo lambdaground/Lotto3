@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes.js";
+import { registerRoutes } from "./routes"; 
 import { createServer } from "http";
 
 const app = express();
@@ -51,26 +51,31 @@ app.use((req, res, next) => {
   next();
 });
 
-// ⭐️ 핵심: 에러가 나던 Top-level await 코드를 제거하고
-// setupApp 함수 안으로 안전하게 옮김
-let routesRegistered = false;
-
-export async function setupApp() {
-  if (!routesRegistered) {
-    // registerRoutes가 여기서 실행됩니다 (안전함)
+// ⭐️ [핵심 수정] setupApp 함수 껍데기 제거!
+// Vercel이 app을 로드할 때 즉시 라우트를 등록하도록 실행합니다.
+(async () => {
+  try {
     await registerRoutes(httpServer, app);
-    
-    // 에러 핸들러
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      res.status(status).json({ message });
-      throw err;
-    });
-
-    routesRegistered = true;
+    console.log("✅ Routes registered successfully");
+  } catch (err) {
+    console.error("❌ Failed to register routes:", err);
   }
-  return app;
+})();
+
+// 에러 핸들러 (라우트 등록 후 실행되어야 함)
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+});
+
+// ⭐️ [로컬 실행용] 로컬 환경(npm run dev)에서만 포트를 엽니다.
+// Vercel은 자체적으로 포트를 관리하므로 이 부분이 실행되지 않거나 무시되어야 합니다.
+if (process.env.NODE_ENV !== "production") {
+  const PORT = 5000;
+  httpServer.listen(PORT, "0.0.0.0", () => {
+    log(`🚀 Local Server running on port ${PORT}`);
+  });
 }
 
 export default app;
