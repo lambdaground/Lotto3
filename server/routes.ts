@@ -193,30 +193,42 @@ function selectBestNumbersForPairing(
 }
 
 // ✅ [수정됨] statType 파라미터 추가 및 Cold 로직 구현
+// ✅ [수정됨] Hot/Cold 모두 '상위 20개 풀(Pool)' 전략 적용
 function generateStatisticalNumbers(
   lottoData: LottoDraw[],
   selectedNumbers: number[] = [],
-  statType: "hot" | "cold" = "hot" // 기본값은 hot
+  statType: "hot" | "cold" = "hot"
 ): number[] {
   const generatedNumbers: number[] = [...selectedNumbers];
 
-  // 1. Cold 모드일 경우: 페어링 점수 로직 무시하고 단순히 '안 나온 번호' 우선 채움
+  // -------------------------------------------------------
+  // 1. Cold 모드 (적게 나온 번호)
+  // -------------------------------------------------------
   if (statType === "cold") {
     const stats = calculateStatistics(lottoData);
-    // Cold Numbers (빈도수 낮은 순) 가져오기
-    // stats.coldNumbers는 상위 10개만 있으므로, 전체 빈도수를 가져와서 정렬
-    const allCold = [...stats.numberFrequencies]
-        .sort((a, b) => a.count - b.count) // 오름차순 (적게 나온 순)
+    
+    // 적게 나온 순서대로 정렬 (오름차순)
+    const sortedByCold = [...stats.numberFrequencies]
+        .sort((a, b) => a.count - b.count);
+
+    // 하위 20개를 후보군으로 설정
+    const poolSize = 20; 
+    const candidates = sortedByCold
+        .slice(0, poolSize)
         .map(n => n.number);
 
-    for (const num of allCold) {
-      if (generatedNumbers.length >= 6) break;
-      if (!generatedNumbers.includes(num)) {
-        generatedNumbers.push(num);
+    // 후보군에서 랜덤하게 뽑아 채우기
+    while (generatedNumbers.length < 6 && candidates.length > 0) {
+      const randomIndex = Math.floor(Math.random() * candidates.length);
+      const pickedNum = candidates[randomIndex];
+
+      if (!generatedNumbers.includes(pickedNum)) {
+        generatedNumbers.push(pickedNum);
       }
+      candidates.splice(randomIndex, 1); // 뽑은 건 제거
     }
     
-    // 혹시라도 부족하면 랜덤 채움 (Cold 데이터가 극히 적을 경우 대비)
+    // 부족하면 나머지 랜덤
     while (generatedNumbers.length < 6) {
       const randomNum = Math.floor(Math.random() * 45) + 1;
       if (!generatedNumbers.includes(randomNum)) {
@@ -227,15 +239,53 @@ function generateStatisticalNumbers(
     return generatedNumbers.sort((a, b) => a - b);
   }
 
-  // 2. Hot 모드 (기존 로직 유지): 페어링(궁합) 점수 기반 추천
+  // -------------------------------------------------------
+  // 2. Hot 모드 (자주 나온 번호)
+  // -------------------------------------------------------
   const selectedCount = selectedNumbers.length;
 
+  // [핵심 수정] 사용자가 선택한 번호가 없을 때 -> 상위 20개 중 랜덤 추출
   if (selectedCount === 0) {
     const stats = calculateStatistics(lottoData);
-    const hotNums = stats.hotNumbers.slice(0, 6).map((h) => h.number);
-    return hotNums.sort((a, b) => a - b);
+    
+    // 자주 나온 순서대로 정렬 (내림차순)
+    const sortedByHot = [...stats.numberFrequencies]
+        .sort((a, b) => b.count - a.count);
+
+    // ✅ 상위 20개를 후보군으로 설정 (Hot Pool)
+    const poolSize = 20;
+    const candidates = sortedByHot
+        .slice(0, poolSize)
+        .map(n => n.number);
+
+    // 후보군에서 랜덤하게 뽑아 채우기
+    while (generatedNumbers.length < 6 && candidates.length > 0) {
+        const randomIndex = Math.floor(Math.random() * candidates.length);
+        const pickedNum = candidates[randomIndex];
+        
+        if (!generatedNumbers.includes(pickedNum)) {
+            generatedNumbers.push(pickedNum);
+        }
+        candidates.splice(randomIndex, 1);
+    }
+    
+    // 혹시 부족하면 랜덤
+    while (generatedNumbers.length < 6) {
+        const randomNum = Math.floor(Math.random() * 45) + 1;
+        if (!generatedNumbers.includes(randomNum)) {
+            generatedNumbers.push(randomNum);
+        }
+    }
+
+    return generatedNumbers.sort((a, b) => a - b);
   }
 
+  // -------------------------------------------------------
+  // 3. Hot 모드 + 사용자 선택 번호 있음 (궁합수 로직 유지)
+  // -------------------------------------------------------
+  // 사용자가 번호를 일부 선택했을 때는 단순 빈도보다는 
+  // 선택한 번호와 '궁합이 좋은(같이 자주 나온)' 번호를 추천하는 것이 더 정확합니다.
+  
   let numbersForPairing: number[];
   let statisticalSlots: number;
 
@@ -257,6 +307,9 @@ function generateStatisticalNumbers(
     .map(([num]) => num);
 
   let addedStatistical = 0;
+  // 궁합 좋은 순서대로 뽑되, 여기도 약간의 다양성을 원하시면 
+  // 상위권 10개 중 랜덤으로 뽑게 수정 가능하지만, 
+  // 현재는 '가장 궁합 좋은 수'를 우선시하도록 유지했습니다.
   for (const num of sortedByPair) {
     if (addedStatistical >= statisticalSlots) break;
     if (!generatedNumbers.includes(num)) {
