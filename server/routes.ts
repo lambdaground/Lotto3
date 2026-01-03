@@ -260,7 +260,12 @@ export async function registerRoutes(
       return res.status(401).json({ error: "Unauthorized" });
     }
     
-    const result = await importLocalData();
+    // 👇 [추가] 빈틈 채우기 실행 주소
+  app.get("/api/setup/fill-gaps", async (req, res) => {
+    if (req.query.key !== "mySecretKey8201") {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const result = await fillMissingEpisodes();
     res.json(result);
   });
 
