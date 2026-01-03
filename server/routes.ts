@@ -1,10 +1,10 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
-import path from "path";
-import fs from "fs";
+import { type Server } from "http";
+import { createClient } from "@supabase/supabase-js"; // Supabase 클라이언트 추가
+import { setupCronRoutes } from "./cron-job"; // 크론 잡 라우트 추가
 
 // ------------------------------------------------------------------
-// [1] 데이터 타입 정의
+// [1] 데이터 타입 정의 (프론트엔드와 통신하는 형식)
 // ------------------------------------------------------------------
 interface LottoDraw {
   drawNo: number;
@@ -25,51 +25,31 @@ interface PairFrequency {
 }
 
 // ------------------------------------------------------------------
-// [2] 전역 변수 및 데이터 관리 함수 (Load & Save)
+// [2] Supabase 설정 및 유틸리티
 // ------------------------------------------------------------------
-let lottoData: LottoDraw[] = [];
-const DATA_FILE_PATH = path.join(process.cwd(), "server/data/lotto-history.json");
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-function loadLottoData() {
-  try {
-    if (fs.existsSync(DATA_FILE_PATH)) {
-      const rawData = fs.readFileSync(DATA_FILE_PATH, "utf-8");
-      lottoData = JSON.parse(rawData);
-      lottoData.sort((a, b) => b.drawNo - a.drawNo);
-      console.log(`Loaded ${lottoData.length} lotto draws`);
-    } else {
-      console.log("No data file found, starting with empty list.");
-      lottoData = [];
-    }
-  } catch (error) {
-    console.error("Failed to load lotto data:", error);
-    lottoData = [];
-  }
-}
-
-// ✅ [신규 기능] API에서 받아온 데이터를 파일에 영구 저장하는 함수
-function saveLottoData() {
-  try {
-    lottoData.sort((a, b) => b.drawNo - a.drawNo);
-    fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(lottoData, null, 2), "utf-8");
-    console.log("Successfully saved updated lotto data to file.");
-  } catch (error) {
-    console.error("Failed to save lotto data:", error);
-  }
-}
-
-// ✅ [신규 기능] 오늘 날짜 기준 예상 회차 계산 함수
-function getExpectedDrwNo(): number {
-  const now = new Date();
-  const baseDate = new Date('2002-12-07T20:40:00'); // 1회차
-  const diffTime = now.getTime() - baseDate.getTime();
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
-  let round = Math.floor(diffDays / 7) + 1;
-  return round;
+// DB의 row 데이터를 프론트엔드용 LottoDraw 객체로 변환하는 헬퍼 함수
+function mapDbToLottoDraw(row: any): LottoDraw {
+  return {
+    drawNo: row.drw_no,
+    date: row.drw_date,
+    numbers: [
+      row.drwt_no1,
+      row.drwt_no2,
+      row.drwt_no3,
+      row.drwt_no4,
+      row.drwt_no5,
+      row.drwt_no6,
+    ],
+    bonus: row.bnus_no,
+  };
 }
 
 // ------------------------------------------------------------------
-// [3] 통계 및 번호 생성 로직 (기존 코드 유지)
+// [3] 통계 및 번호 생성 로직 (기존 코드 유지 + 매개변수화)
 // ------------------------------------------------------------------
 function generateRandomNumbers(selectedNumbers: number[] = []): number[] {
   const nums = [...selectedNumbers];
@@ -80,6 +60,7 @@ function generateRandomNumbers(selectedNumbers: number[] = []): number[] {
   return nums.sort((a, b) => a - b);
 }
 
+// 기존에는 전역변수 lottoData를 썼지만, 이제는 함수 인자로 데이터를 받습니다.
 function calculateStatistics(draws: LottoDraw[]) {
   const numberCounts = new Map<number, number>();
   for (let i = 1; i <= 45; i++) numberCounts.set(i, 0);
@@ -103,8 +84,12 @@ function calculateStatistics(draws: LottoDraw[]) {
     });
   }
 
-  const hotNumbers = [...numberFrequencies].sort((a, b) => b.count - a.count).slice(0, 10);
-  const coldNumbers = [...numberFrequencies].sort((a, b) => a.count - b.count).slice(0, 10);
+  const hotNumbers = [...numberFrequencies]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+  const coldNumbers = [...numberFrequencies]
+    .sort((a, b) => a.count - b.count)
+    .slice(0, 10);
 
   const pairCounts = new Map<string, number>();
   for (const draw of draws) {
@@ -131,10 +116,21 @@ function calculateStatistics(draws: LottoDraw[]) {
     max: Math.max(...years),
   };
 
-  return { totalDraws, numberFrequencies, hotNumbers, coldNumbers, topPairs, yearRange };
+  return {
+    totalDraws,
+    numberFrequencies,
+    hotNumbers,
+    coldNumbers,
+    topPairs,
+    yearRange,
+  };
 }
 
-function filterDrawsByPeriod(draws: LottoDraw[], year?: number, month?: number): LottoDraw[] {
+function filterDrawsByPeriod(
+  draws: LottoDraw[],
+  year?: number,
+  month?: number
+): LottoDraw[] {
   return draws.filter((draw) => {
     const drawDate = new Date(draw.date);
     if (year && drawDate.getFullYear() !== year) return false;
@@ -143,7 +139,10 @@ function filterDrawsByPeriod(draws: LottoDraw[], year?: number, month?: number):
   });
 }
 
-function getPairScores(selectedNumbers: number[]): Map<number, number> {
+function getPairScores(
+  lottoData: LottoDraw[],
+  selectedNumbers: number[]
+): Map<number, number> {
   const pairScores = new Map<number, number>();
   for (const draw of lottoData) {
     const nums = draw.numbers;
@@ -160,7 +159,10 @@ function getPairScores(selectedNumbers: number[]): Map<number, number> {
   return pairScores;
 }
 
-function getIndividualPairScores(num: number): Map<number, number> {
+function getIndividualPairScores(
+  lottoData: LottoDraw[],
+  num: number
+): Map<number, number> {
   const scores = new Map<number, number>();
   for (const draw of lottoData) {
     if (draw.numbers.includes(num)) {
@@ -172,25 +174,31 @@ function getIndividualPairScores(num: number): Map<number, number> {
   return scores;
 }
 
-function selectBestNumbersForPairing(selectedNumbers: number[]): number[] {
+function selectBestNumbersForPairing(
+  lottoData: LottoDraw[],
+  selectedNumbers: number[]
+): number[] {
   const numberScores: { num: number; totalScore: number }[] = [];
   for (const num of selectedNumbers) {
-    const pairScores = getIndividualPairScores(num);
+    const pairScores = getIndividualPairScores(lottoData, num);
     let totalScore = 0;
     for (const [, score] of pairScores) totalScore += score;
     numberScores.push({ num, totalScore });
   }
   numberScores.sort((a, b) => b.totalScore - a.totalScore);
-  return numberScores.slice(0, 2).map(n => n.num);
+  return numberScores.slice(0, 2).map((n) => n.num);
 }
 
-function generateStatisticalNumbers(selectedNumbers: number[] = []): number[] {
+function generateStatisticalNumbers(
+  lottoData: LottoDraw[],
+  selectedNumbers: number[] = []
+): number[] {
   const selectedCount = selectedNumbers.length;
   const generatedNumbers: number[] = [...selectedNumbers];
 
   if (selectedCount === 0) {
     const stats = calculateStatistics(lottoData);
-    const hotNums = stats.hotNumbers.slice(0, 6).map(h => h.number);
+    const hotNums = stats.hotNumbers.slice(0, 6).map((h) => h.number);
     return hotNums.sort((a, b) => a - b);
   }
 
@@ -204,11 +212,11 @@ function generateStatisticalNumbers(selectedNumbers: number[] = []): number[] {
     numbersForPairing = selectedNumbers;
     statisticalSlots = 3;
   } else {
-    numbersForPairing = selectBestNumbersForPairing(selectedNumbers);
+    numbersForPairing = selectBestNumbersForPairing(lottoData, selectedNumbers);
     statisticalSlots = 6 - selectedCount;
   }
 
-  const pairScores = getPairScores(numbersForPairing);
+  const pairScores = getPairScores(lottoData, numbersForPairing);
   const sortedByPair = Array.from(pairScores.entries())
     .filter(([num]) => !selectedNumbers.includes(num))
     .sort(([, a], [, b]) => b - a)
@@ -235,123 +243,149 @@ function generateStatisticalNumbers(selectedNumbers: number[] = []): number[] {
 // ------------------------------------------------------------------
 // [4] 라우터 등록 (API Endpoints)
 // ------------------------------------------------------------------
-export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
-  // 서버 시작 시 파일에서 데이터 로드
-  loadLottoData();
+export async function registerRoutes(
+  httpServer: Server,
+  app: Express
+): Promise<Server> {
+  
+  // ✅ 1. 크론 잡 라우트 등록 (가장 중요)
+  setupCronRoutes(app);
 
-  // ✅ [수정됨] 최신 로또 번호 조회 및 자동 업데이트 API
+  // ✅ 2. 최신 로또 번호 조회 (DB 사용)
   app.get("/api/lotto/latest", async (req, res) => {
     try {
-      // 1. 현재 시간 및 요일 확인
-      const now = new Date();
-      const dayOfWeek = now.getDay(); // 6 = 토요일
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      
-      // 2. 오늘 기준 예상 회차 계산
-      const expectedDrwNo = getExpectedDrwNo();
+      // Supabase에서 가장 최신 회차 1개 조회
+      const { data, error } = await supabase
+        .from("lotto_history")
+        .select("*")
+        .order("drw_no", { ascending: false })
+        .limit(1)
+        .single();
 
-      // 3. 파일에 이미 해당 회차 데이터가 있는지 확인
-      const existingData = lottoData.find(d => d.drawNo === expectedDrwNo);
-
-      // [Case 1] 파일에 데이터가 있으면 바로 반환
-      if (existingData) {
-        return res.json(existingData);
+      if (error) {
+        console.error("Supabase error:", error);
+        return res.status(500).json({ error: "DB Fetch Error" });
       }
 
-      // [Case 2] 파일에 없고, 업데이트 가능한 시간인지 확인
-      // 조건: 토요일 오후 9시 50분(21:50) 이후, 또는 일~금요일
-      let canUpdate = false;
-      if (dayOfWeek === 6) {
-        if (hours > 21 || (hours === 21 && minutes >= 50)) {
-          canUpdate = true;
-        }
-      } else {
-        canUpdate = true; // 토요일이 아니면 언제든 업데이트 가능
-      }
-
-      // [업데이트 실행]
-      if (canUpdate) {
-        console.log(`Checking external API for draw No. ${expectedDrwNo}...`);
-        const response = await fetch(`https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=${expectedDrwNo}`);
-        const data = await response.json();
-
-        if (data.returnValue === "success") {
-          const newDraw: LottoDraw = {
-            drawNo: data.drwNo,
-            date: data.drwNoDate,
-            numbers: [data.drwtNo1, data.drwtNo2, data.drwtNo3, data.drwtNo4, data.drwtNo5, data.drwtNo6],
-            bonus: data.bnusNo
-          };
-
-          // 메모리에 추가하고 파일에 저장
-          lottoData.unshift(newDraw);
-          saveLottoData(); // 🔥 파일 저장 실행
-          
-          return res.json(newDraw);
-        }
-      }
-
-      // [Fallback] 아직 업데이트 시간이 아니거나 데이터가 없으면 기존 최신 데이터 반환
-      if (lottoData.length > 0) {
-        return res.json(lottoData[0]);
-      } else {
+      if (!data) {
         return res.status(404).json({ error: "No data available" });
       }
 
+      const latestDraw = mapDbToLottoDraw(data);
+      res.json(latestDraw);
     } catch (error) {
       console.error("Error in /api/lotto/latest:", error);
-      if (lottoData.length > 0) res.json(lottoData[0]);
-      else res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
-  // 기존 API 유지: 전체 이력 조회
-  app.get("/api/lotto/history", (req, res) => {
+  // ✅ 3. 전체 이력 조회 (페이지네이션)
+  app.get("/api/lotto/history", async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
     const year = req.query.year ? parseInt(req.query.year as string) : undefined;
 
-    let filtered = lottoData;
-    if (year) {
-      filtered = filterDrawsByPeriod(lottoData, year);
+    try {
+      // 기본 쿼리
+      let query = supabase
+        .from("lotto_history")
+        .select("*", { count: "exact" })
+        .order("drw_no", { ascending: false });
+
+      // 연도 필터링
+      if (year) {
+        query = query
+          .gte("drw_date", `${year}-01-01`)
+          .lte("drw_date", `${year}-12-31`);
+      }
+
+      // 페이지네이션
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const { data, count, error } = await query.range(from, to);
+
+      if (error) throw error;
+
+      const draws = (data || []).map(mapDbToLottoDraw);
+      const total = count || 0;
+      const totalPages = Math.ceil(total / pageSize);
+
+      res.json({ draws, total, page, pageSize, totalPages });
+    } catch (error) {
+      console.error("History fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch history" });
     }
-
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / pageSize);
-    const start = (page - 1) * pageSize;
-    const draws = filtered.slice(start, start + pageSize);
-
-    res.json({ draws, total, page, pageSize, totalPages });
   });
 
-  // 기존 API 유지: 통계 조회
-  app.get("/api/lotto/statistics", (req, res) => {
+  // ✅ 4. 통계 조회 (전체 데이터를 가져와서 계산)
+  // 로또 데이터는 약 1200개 row이므로 전체를 가져와도 성능상 괜찮습니다.
+  app.get("/api/lotto/statistics", async (req, res) => {
     const year = req.query.year ? parseInt(req.query.year as string) : undefined;
-    const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+    const month = req.query.month
+      ? parseInt(req.query.month as string)
+      : undefined;
 
-    const filtered = filterDrawsByPeriod(lottoData, year, month);
-    const stats = calculateStatistics(filtered.length > 0 ? filtered : lottoData);
+    try {
+      // 통계 계산을 위해 전체 데이터를 가져옵니다.
+      const { data, error } = await supabase
+        .from("lotto_history")
+        .select("*")
+        .order("drw_no", { ascending: false });
 
-    res.json(stats);
+      if (error) throw error;
+
+      let allDraws = (data || []).map(mapDbToLottoDraw);
+
+      // 메모리상에서 필터링 (DB 쿼리보다 날짜 함수 처리가 편함)
+      if (year || month) {
+        allDraws = filterDrawsByPeriod(allDraws, year, month);
+      }
+
+      const stats = calculateStatistics(allDraws);
+      res.json(stats);
+    } catch (error) {
+      console.error("Stats fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch statistics" });
+    }
   });
 
-  // 기존 API 유지: 번호 생성
-  app.post("/api/lotto/generate", (req, res) => {
+  // ✅ 5. 번호 생성 (DB 데이터 기반 알고리즘 적용)
+  app.post("/api/lotto/generate", async (req, res) => {
     const { selectedNumbers = [], useStatistical = false } = req.body;
 
-    if (!Array.isArray(selectedNumbers)) return res.status(400).json({ error: "selectedNumbers must be an array" });
-    if (selectedNumbers.length > 5) return res.status(400).json({ error: "Maximum 5 numbers can be selected" });
+    if (!Array.isArray(selectedNumbers))
+      return res.status(400).json({ error: "selectedNumbers must be an array" });
+    if (selectedNumbers.length > 5)
+      return res.status(400).json({ error: "Maximum 5 numbers can be selected" });
     for (const num of selectedNumbers) {
-      if (typeof num !== "number" || num < 1 || num > 45) return res.status(400).json({ error: "Numbers must be between 1 and 45" });
+      if (typeof num !== "number" || num < 1 || num > 45)
+        return res.status(400).json({ error: "Numbers must be between 1 and 45" });
     }
 
-    const uniqueSelected = [...new Set(selectedNumbers)];
-    const numbers = useStatistical 
-      ? generateStatisticalNumbers(uniqueSelected)
-      : generateRandomNumbers(uniqueSelected);
+    try {
+      // 통계 기반 생성일 경우, 분석을 위해 DB 데이터를 가져와야 함
+      let numbers: number[];
+      if (useStatistical) {
+        const { data, error } = await supabase
+          .from("lotto_history")
+          .select("*")
+          .order("drw_no", { ascending: false });
+        
+        if (error) throw error;
+        
+        const allDraws = (data || []).map(mapDbToLottoDraw);
+        const uniqueSelected = [...new Set(selectedNumbers)];
+        numbers = generateStatisticalNumbers(allDraws, uniqueSelected);
+      } else {
+        const uniqueSelected = [...new Set(selectedNumbers)];
+        numbers = generateRandomNumbers(uniqueSelected);
+      }
 
-    res.json({ numbers });
+      res.json({ numbers });
+    } catch (error) {
+      console.error("Generate error:", error);
+      res.status(500).json({ error: "Failed to generate numbers" });
+    }
   });
 
   return httpServer;
