@@ -372,6 +372,49 @@ export const translations: Translations = {
     zh: "优先选择与已选号码常一起出现的号码",
     ja: "選択した番号とよく一緒に出る番号を優先",
   },
+// ✅ 아래 내용을 추가하세요
+  algoSelect: {
+    ko: "생성 알고리즘 선택",
+    en: "Select Algorithm",
+    zh: "选择生成算法",
+    ja: "アルゴリズム選択",
+  },
+  algoRandom: {
+    ko: "랜덤",
+    en: "Random",
+    zh: "随机",
+    ja: "ランダム",
+  },
+  algoHot: {
+    ko: "자주 나옴",
+    en: "Hot Numbers",
+    zh: "热号 (常出)",
+    ja: "よく出る",
+  },
+  algoCold: {
+    ko: "적게 나옴",
+    en: "Cold Numbers",
+    zh: "冷号 (少出)",
+    ja: "あまり出ない",
+  },
+  descRandom: {
+    ko: "순수 무작위로 번호를 생성합니다.",
+    en: "Generates numbers purely at random.",
+    zh: "纯随机生成号码。",
+    ja: "純粋にランダムで番号を生成します。",
+  },
+  descHot: {
+    ko: "과거 당첨 이력에서 가장 많이 나온 번호 위주로 조합합니다.",
+    en: "Combinations based on frequently drawn numbers.",
+    zh: "基于历史中奖记录中常出的号码进行组合。",
+    ja: "過去の当選履歴で最も多く出た番号を中心に組み合わせます。",
+  },
+  descCold: {
+    ko: "과거 당첨 이력에서 잘 나오지 않았던 번호 위주로 조합합니다.",
+    en: "Combinations based on rarely drawn numbers.",
+    zh: "基于历史中奖记录中少出的号码进行组合。",
+    ja: "過去の当選履歴であまり出なかった番号を中心に組み合わせます。",
+  },
 };
 
 interface LanguageContextType {
