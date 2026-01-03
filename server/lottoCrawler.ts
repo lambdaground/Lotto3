@@ -20,19 +20,26 @@ export async function syncLottoData() {
     .select('drw_no')
     .order('drw_no', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle(); // .single() 대신 안전하게 maybeSingle 사용
 
   let nextRound = 1; // DB가 비어있으면 1회부터 시작
   if (lastData) {
     nextRound = lastData.drw_no + 1;
   }
 
-  // 2. 최신 회차까지 반복해서 가져오기 (한 번에 최대 10개씩만 - 타임아웃 방지)
+  // 2. 최신 회차까지 반복해서 가져오기 (초기 세팅을 위해 200회로 설정됨)
   let fetchCount = 0;
   while (fetchCount < 200) {
     try {
       console.log(`${nextRound}회차 데이터 조회 중...`);
-      const response = await fetch(`${LOTTO_API_URL}${nextRound}`);
+      
+      // ✅ [수정됨] 봇 차단 방지를 위한 User-Agent 헤더 추가
+      const response = await fetch(`${LOTTO_API_URL}${nextRound}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      
       const data = await response.json();
 
       if (data.returnValue === 'fail') {
