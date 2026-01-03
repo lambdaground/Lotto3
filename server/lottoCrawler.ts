@@ -29,7 +29,7 @@ export async function syncLottoData() {
 
   // 2. 최신 회차까지 반복해서 가져오기 (한 번에 최대 10개씩만 - 타임아웃 방지)
   let fetchCount = 0;
-  while (fetchCount < 10) {
+  while (fetchCount < 200) {
     try {
       console.log(`${nextRound}회차 데이터 조회 중...`);
       const response = await fetch(`${LOTTO_API_URL}${nextRound}`);
