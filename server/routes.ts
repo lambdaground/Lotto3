@@ -252,8 +252,8 @@ export async function registerRoutes(
 
   // 2. [수동] JSON 파일 데이터 DB 입력 (1회성)
   app.get("/api/setup/import", async (req, res) => {
-    if (req.query.key !== "debug1234") {
-      return res.status(401).json({ error: "Unauthorized" });
+    if (req.query.key !== "mySecretKey8201") 
+    {    return res.status(401).json({ error: "Unauthorized" });
     }
     const result = await importLocalData();
     res.json(result);
