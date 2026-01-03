@@ -256,7 +256,7 @@ export async function registerRoutes(
   // 👇 [추가] 수동으로 JSON 파일 데이터를 DB에 넣는 주소
   app.get("/api/setup/import", async (req, res) => {
     // 보안을 위해 키 검사 (선택사항이지만 권장)
-    if (req.query.key !== (process.env.CRON_SECRET || "debug1234")) {
+    if (req.query.key !== (process.env.CRON_SECRET || "mySecretKey8201")) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     
@@ -264,16 +264,24 @@ export async function registerRoutes(
     res.json(result);
   });
 
-  // ✅ 2. 최신 로또 번호 조회 (DB 사용)
+  // ✅ 2. 최신 로또 번호 조회 (특정 회차 요청 기능 추가)
   app.get("/api/lotto/latest", async (req, res) => {
     try {
-      // Supabase에서 가장 최신 회차 1개 조회
-      const { data, error } = await supabase
-        .from("lotto_history")
-        .select("*")
-        .order("drw_no", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // 클라이언트가 특정 회차(?drwNo=1205)를 요청했는지 확인
+      const drwNo = req.query.drwNo ? parseInt(req.query.drwNo as string) : null;
+
+      let query = supabase.from("lotto_history").select("*");
+
+      if (drwNo) {
+        // 🔹 특정 회차를 요청한 경우
+        query = query.eq("drw_no", drwNo);
+      } else {
+        // 🔹 그냥 최신 회차를 요청한 경우
+        query = query.order("drw_no", { ascending: false }).limit(1);
+      }
+
+      // 데이터 조회 (.maybeSingle은 데이터가 없으면 null 반환)
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error("Supabase error:", error);
@@ -281,6 +289,7 @@ export async function registerRoutes(
       }
 
       if (!data) {
+        // 데이터가 없으면 404 반환 (아직 크롤링 안 된 경우 등)
         return res.status(404).json({ error: "No data available" });
       }
 
