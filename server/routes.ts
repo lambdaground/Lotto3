@@ -267,20 +267,15 @@ export async function registerRoutes(
   // ✅ 2. 최신 로또 번호 조회 (특정 회차 요청 기능 추가)
   app.get("/api/lotto/latest", async (req, res) => {
     try {
-      // 클라이언트가 특정 회차(?drwNo=1205)를 요청했는지 확인
       const drwNo = req.query.drwNo ? parseInt(req.query.drwNo as string) : null;
-
       let query = supabase.from("lotto_history").select("*");
 
       if (drwNo) {
-        // 🔹 특정 회차를 요청한 경우
-        query = query.eq("drw_no", drwNo);
+        query = query.eq("drw_no", drwNo); // 👈 특정 번호 콕 집어 요청
       } else {
-        // 🔹 그냥 최신 회차를 요청한 경우
-        query = query.order("drw_no", { ascending: false }).limit(1);
+        query = query.order("drw_no", { ascending: false }).limit(1); // 👈 없으면 그냥 최신거
       }
 
-      // 데이터 조회 (.maybeSingle은 데이터가 없으면 null 반환)
       const { data, error } = await query.maybeSingle();
 
       if (error) {
