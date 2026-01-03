@@ -261,7 +261,7 @@ export async function registerRoutes(
 
   // 3. [수동] 빠진 회차 자동 채우기 (Gap Filler)
   app.get("/api/setup/fill-gaps", async (req, res) => {
-    if (req.query.key !== "debug1234") {
+    if (req.query.key !== "mySecretKey8201") {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const result = await fillMissingEpisodes();
