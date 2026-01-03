@@ -29,7 +29,7 @@ export async function syncLottoData() {
 
   // 2. 데이터 수집 (한 번에 50개씩 시도)
   let fetchCount = 0;
-  const MAX_FETCH = 50; 
+  const MAX_FETCH = 5; 
 
   while (fetchCount < MAX_FETCH) {
     try {
