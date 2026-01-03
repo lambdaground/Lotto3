@@ -2,8 +2,8 @@ import type { Express } from "express";
 import { type Server } from "http";
 import { createClient } from "@supabase/supabase-js";
 import { setupCronRoutes } from "./cron-job";
-import { importLocalData } from "./importData"; // 파일 임포트
-import { fillMissingEpisodes } from "./gapFiller"; // 빈틈 채우기 (추가됨)
+import { importLocalData } from "./importData";
+import { fillMissingEpisodes } from "./gapFiller";
 
 // ------------------------------------------------------------------
 // [1] 데이터 타입 정의
@@ -84,11 +84,14 @@ function calculateStatistics(draws: LottoDraw[]) {
     });
   }
 
+  // 자주 나온 순서 (내림차순)
   const hotNumbers = [...numberFrequencies]
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
+    
+  // 적게 나온 순서 (오름차순)
   const coldNumbers = [...numberFrequencies]
-    .sort((a, b) => a.count - b.count)
+    .sort((a, b) => a.count - b.count) // 적은 것부터 정렬
     .slice(0, 10);
 
   const pairCounts = new Map<string, number>();
@@ -189,12 +192,43 @@ function selectBestNumbersForPairing(
   return numberScores.slice(0, 2).map((n) => n.num);
 }
 
+// ✅ [수정됨] statType 파라미터 추가 및 Cold 로직 구현
 function generateStatisticalNumbers(
   lottoData: LottoDraw[],
-  selectedNumbers: number[] = []
+  selectedNumbers: number[] = [],
+  statType: "hot" | "cold" = "hot" // 기본값은 hot
 ): number[] {
-  const selectedCount = selectedNumbers.length;
   const generatedNumbers: number[] = [...selectedNumbers];
+
+  // 1. Cold 모드일 경우: 페어링 점수 로직 무시하고 단순히 '안 나온 번호' 우선 채움
+  if (statType === "cold") {
+    const stats = calculateStatistics(lottoData);
+    // Cold Numbers (빈도수 낮은 순) 가져오기
+    // stats.coldNumbers는 상위 10개만 있으므로, 전체 빈도수를 가져와서 정렬
+    const allCold = [...stats.numberFrequencies]
+        .sort((a, b) => a.count - b.count) // 오름차순 (적게 나온 순)
+        .map(n => n.number);
+
+    for (const num of allCold) {
+      if (generatedNumbers.length >= 6) break;
+      if (!generatedNumbers.includes(num)) {
+        generatedNumbers.push(num);
+      }
+    }
+    
+    // 혹시라도 부족하면 랜덤 채움 (Cold 데이터가 극히 적을 경우 대비)
+    while (generatedNumbers.length < 6) {
+      const randomNum = Math.floor(Math.random() * 45) + 1;
+      if (!generatedNumbers.includes(randomNum)) {
+        generatedNumbers.push(randomNum);
+      }
+    }
+    
+    return generatedNumbers.sort((a, b) => a - b);
+  }
+
+  // 2. Hot 모드 (기존 로직 유지): 페어링(궁합) 점수 기반 추천
+  const selectedCount = selectedNumbers.length;
 
   if (selectedCount === 0) {
     const stats = calculateStatistics(lottoData);
@@ -250,16 +284,16 @@ export async function registerRoutes(
   // 1. 크론 잡 설정
   setupCronRoutes(app);
 
-  // 2. [수동] JSON 파일 데이터 DB 입력 (1회성)
+  // 2. [수동] JSON 파일 데이터 DB 입력
   app.get("/api/setup/import", async (req, res) => {
-    if (req.query.key !== "mySecretKey8201") 
-    {    return res.status(401).json({ error: "Unauthorized" });
+    if (req.query.key !== "mySecretKey8201") {
+      return res.status(401).json({ error: "Unauthorized" });
     }
     const result = await importLocalData();
     res.json(result);
   });
 
-  // 3. [수동] 빠진 회차 자동 채우기 (Gap Filler)
+  // 3. [수동] 빠진 회차 자동 채우기
   app.get("/api/setup/fill-gaps", async (req, res) => {
     if (req.query.key !== "mySecretKey8201") {
       return res.status(401).json({ error: "Unauthorized" });
@@ -268,7 +302,7 @@ export async function registerRoutes(
     res.json(result);
   });
 
-  // 4. 최신 회차 조회 (특정 회차 조회 포함)
+  // 4. 최신 회차 조회
   app.get("/api/lotto/latest", async (req, res) => {
     try {
       const drwNo = req.query.drwNo
@@ -293,7 +327,7 @@ export async function registerRoutes(
     }
   });
 
-  // 5. 전체 이력 조회 (페이지네이션)
+  // 5. 전체 이력 조회
   app.get("/api/lotto/history", async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
@@ -329,7 +363,7 @@ export async function registerRoutes(
     }
   });
 
-  // ✅ 6. 통계 조회 (수정됨)
+  // 6. 통계 조회
   app.get("/api/lotto/statistics", async (req, res) => {
     const year = req.query.year
       ? parseInt(req.query.year as string)
@@ -360,9 +394,10 @@ export async function registerRoutes(
     }
   });
 
-  // ✅ 7. 번호 생성
+  // ✅ 7. 번호 생성 (수정됨)
   app.post("/api/lotto/generate", async (req, res) => {
-    const { selectedNumbers = [], useStatistical = false } = req.body;
+    // statType 파라미터 추가 수신
+    const { selectedNumbers = [], useStatistical = false, statType = 'hot' } = req.body;
 
     if (!Array.isArray(selectedNumbers))
       return res
@@ -391,7 +426,9 @@ export async function registerRoutes(
 
         const allDraws = (data || []).map(mapDbToLottoDraw);
         const uniqueSelected = [...new Set(selectedNumbers)];
-        numbers = generateStatisticalNumbers(allDraws, uniqueSelected);
+        
+        // statType 전달 (hot 또는 cold)
+        numbers = generateStatisticalNumbers(allDraws, uniqueSelected, statType as 'hot'|'cold');
       } else {
         const uniqueSelected = [...new Set(selectedNumbers)];
         numbers = generateRandomNumbers(uniqueSelected);
