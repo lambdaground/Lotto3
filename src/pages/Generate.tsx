@@ -75,7 +75,8 @@ export default function Generate() {
             {/* 생성 알고리즘 선택 버튼 */}
             <div className="space-y-3 p-4 bg-muted/50 rounded-lg border">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">생성 알고리즘 선택</span>
+                {/* ✅ 번역 적용: algoSelect */}
+                <span className="text-sm font-medium">{t("algoSelect")}</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Button
@@ -84,7 +85,8 @@ export default function Generate() {
                   className="flex flex-col h-auto py-2 px-1 gap-1"
                 >
                   <Dices className="w-4 h-4" />
-                  <span className="text-xs">랜덤</span>
+                  {/* ✅ 번역 적용: algoRandom */}
+                  <span className="text-xs">{t("algoRandom")}</span>
                 </Button>
                 <Button
                   variant={statMode === "hot" ? "default" : "outline"}
@@ -92,7 +94,8 @@ export default function Generate() {
                   className={`flex flex-col h-auto py-2 px-1 gap-1 ${statMode === "hot" ? "bg-red-500 hover:bg-red-600 border-red-500" : "hover:text-red-500 hover:border-red-500"}`}
                 >
                   <Flame className="w-4 h-4" />
-                  <span className="text-xs">자주 나옴</span>
+                  {/* ✅ 번역 적용: algoHot */}
+                  <span className="text-xs">{t("algoHot")}</span>
                 </Button>
                 <Button
                   variant={statMode === "cold" ? "default" : "outline"}
@@ -100,13 +103,16 @@ export default function Generate() {
                   className={`flex flex-col h-auto py-2 px-1 gap-1 ${statMode === "cold" ? "bg-blue-500 hover:bg-blue-600 border-blue-500" : "hover:text-blue-500 hover:border-blue-500"}`}
                 >
                   <Snowflake className="w-4 h-4" />
-                  <span className="text-xs">적게 나옴</span>
+                  {/* ✅ 번역 적용: algoCold */}
+                  <span className="text-xs">{t("algoCold")}</span>
                 </Button>
               </div>
+              
+              {/* ✅ 번역 적용: 설명 텍스트 */}
               <p className="text-xs text-muted-foreground text-center mt-2">
-                {statMode === "none" && "순수 무작위로 번호를 생성합니다."}
-                {statMode === "hot" && "과거 당첨 이력에서 가장 많이 나온 번호 위주로 조합합니다."}
-                {statMode === "cold" && "과거 당첨 이력에서 잘 나오지 않았던 번호 위주로 조합합니다."}
+                {statMode === "none" && t("descRandom")}
+                {statMode === "hot" && t("descHot")}
+                {statMode === "cold" && t("descCold")}
               </p>
             </div>
 
