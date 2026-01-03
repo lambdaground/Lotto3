@@ -260,7 +260,7 @@ export async function registerRoutes(
         .select("*")
         .order("drw_no", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Supabase error:", error);
