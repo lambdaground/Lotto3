@@ -1,0 +1,32 @@
+name: Lotto Auto Update
+
+on:
+  schedule:
+    # 매주 토요일 밤 12:30 UTC (한국 시간 일요일 오전 9:30)
+    # 로또 사이트가 토요일 밤에는 트래픽이 많아 차단이 심하므로,
+    # 안전하게 일요일 아침에 실행하도록 설정했습니다.
+    - cron: '30 0 * * 0'
+  workflow_dispatch: # 수동 실행 버튼 (테스트용)
+
+jobs:
+  update-lotto:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 로또 크롤러 실행
+        env:
+          # GitHub Secrets에 저장된 키를 가져옵니다
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run crawler
