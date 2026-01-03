@@ -14,7 +14,7 @@ export function setupCronRoutes(app: Express) {
     // 1. 보안 체크 (Vercel Cron Secret 또는 임의의 키)
     // 환경변수 CRON_SECRET이 없으면 'debug1234'를 기본값으로 사용
     const key = req.query.key;
-    const cronSecret = process.env.CRON_SECRET || "debug1234";
+    const cronSecret = process.env.CRON_SECRET || "mySecretKey8201";
 
     if (key !== cronSecret) {
       return res.status(401).json({ 
