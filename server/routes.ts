@@ -1,12 +1,12 @@
-// 상단 import에 추가
-import { importLocalData } from "./importData";
 import type { Express } from "express";
 import { type Server } from "http";
-import { createClient } from "@supabase/supabase-js"; // Supabase 클라이언트 추가
-import { setupCronRoutes } from "./cron-job"; // 크론 잡 라우트 추가
+import { createClient } from "@supabase/supabase-js";
+import { setupCronRoutes } from "./cron-job";
+import { importLocalData } from "./importData"; // 파일 임포트
+import { fillMissingEpisodes } from "./gapFiller"; // 빈틈 채우기 (추가됨)
 
 // ------------------------------------------------------------------
-// [1] 데이터 타입 정의 (프론트엔드와 통신하는 형식)
+// [1] 데이터 타입 정의
 // ------------------------------------------------------------------
 interface LottoDraw {
   drawNo: number;
@@ -33,7 +33,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// DB의 row 데이터를 프론트엔드용 LottoDraw 객체로 변환하는 헬퍼 함수
 function mapDbToLottoDraw(row: any): LottoDraw {
   return {
     drawNo: row.drw_no,
@@ -51,7 +50,7 @@ function mapDbToLottoDraw(row: any): LottoDraw {
 }
 
 // ------------------------------------------------------------------
-// [3] 통계 및 번호 생성 로직 (기존 코드 유지 + 매개변수화)
+// [3] 통계 및 번호 생성 로직
 // ------------------------------------------------------------------
 function generateRandomNumbers(selectedNumbers: number[] = []): number[] {
   const nums = [...selectedNumbers];
@@ -62,7 +61,6 @@ function generateRandomNumbers(selectedNumbers: number[] = []): number[] {
   return nums.sort((a, b) => a - b);
 }
 
-// 기존에는 전역변수 lottoData를 썼지만, 이제는 함수 인자로 데이터를 받습니다.
 function calculateStatistics(draws: LottoDraw[]) {
   const numberCounts = new Map<number, number>();
   for (let i = 1; i <= 45; i++) numberCounts.set(i, 0);
@@ -249,79 +247,72 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
-  // ✅ 1. 크론 잡 라우트 등록 (가장 중요)
+  // 1. 크론 잡 설정
   setupCronRoutes(app);
 
-  // 👇 [추가] 수동으로 JSON 파일 데이터를 DB에 넣는 주소
+  // 2. [수동] JSON 파일 데이터 DB 입력 (1회성)
   app.get("/api/setup/import", async (req, res) => {
-    // 보안을 위해 키 검사 (선택사항이지만 권장)
-    if (req.query.key !== (process.env.CRON_SECRET || "mySecretKey8201")) {
+    if (req.query.key !== "debug1234") {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    
-    // 👇 [추가] 빈틈 채우기 실행 주소
+    const result = await importLocalData();
+    res.json(result);
+  });
+
+  // 3. [수동] 빠진 회차 자동 채우기 (Gap Filler)
   app.get("/api/setup/fill-gaps", async (req, res) => {
-    if (req.query.key !== "mySecretKey8201") {
+    if (req.query.key !== "debug1234") {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const result = await fillMissingEpisodes();
     res.json(result);
   });
 
-  // ✅ 2. 최신 로또 번호 조회 (특정 회차 요청 기능 추가)
+  // 4. 최신 회차 조회 (특정 회차 조회 포함)
   app.get("/api/lotto/latest", async (req, res) => {
     try {
-      const drwNo = req.query.drwNo ? parseInt(req.query.drwNo as string) : null;
+      const drwNo = req.query.drwNo
+        ? parseInt(req.query.drwNo as string)
+        : null;
       let query = supabase.from("lotto_history").select("*");
 
       if (drwNo) {
-        query = query.eq("drw_no", drwNo); // 👈 특정 번호 콕 집어 요청
+        query = query.eq("drw_no", drwNo);
       } else {
-        query = query.order("drw_no", { ascending: false }).limit(1); // 👈 없으면 그냥 최신거
+        query = query.order("drw_no", { ascending: false }).limit(1);
       }
 
       const { data, error } = await query.maybeSingle();
 
-      if (error) {
-        console.error("Supabase error:", error);
-        return res.status(500).json({ error: "DB Fetch Error" });
-      }
+      if (error) return res.status(500).json({ error: "DB Fetch Error" });
+      if (!data) return res.status(404).json({ error: "No data available" });
 
-      if (!data) {
-        // 데이터가 없으면 404 반환 (아직 크롤링 안 된 경우 등)
-        return res.status(404).json({ error: "No data available" });
-      }
-
-      const latestDraw = mapDbToLottoDraw(data);
-      res.json(latestDraw);
+      res.json(mapDbToLottoDraw(data));
     } catch (error) {
-      console.error("Error in /api/lotto/latest:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
-  // ✅ 3. 전체 이력 조회 (페이지네이션)
+  // 5. 전체 이력 조회 (페이지네이션)
   app.get("/api/lotto/history", async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
-    const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+    const year = req.query.year
+      ? parseInt(req.query.year as string)
+      : undefined;
 
     try {
-      // 기본 쿼리
       let query = supabase
         .from("lotto_history")
         .select("*", { count: "exact" })
         .order("drw_no", { ascending: false });
 
-      // 연도 필터링
       if (year) {
         query = query
           .gte("drw_date", `${year}-01-01`)
           .lte("drw_date", `${year}-12-31`);
       }
 
-      // 페이지네이션
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
       const { data, count, error } = await query.range(from, to);
@@ -334,21 +325,20 @@ export async function registerRoutes(
 
       res.json({ draws, total, page, pageSize, totalPages });
     } catch (error) {
-      console.error("History fetch error:", error);
       res.status(500).json({ error: "Failed to fetch history" });
     }
   });
 
-  // ✅ 4. 통계 조회 (전체 데이터를 가져와서 계산)
-  // 로또 데이터는 약 1200개 row이므로 전체를 가져와도 성능상 괜찮습니다.
+  // ✅ 6. 통계 조회 (수정됨)
   app.get("/api/lotto/statistics", async (req, res) => {
-    const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+    const year = req.query.year
+      ? parseInt(req.query.year as string)
+      : undefined;
     const month = req.query.month
       ? parseInt(req.query.month as string)
       : undefined;
 
     try {
-      // 통계 계산을 위해 전체 데이터를 가져옵니다.
       const { data, error } = await supabase
         .from("lotto_history")
         .select("*")
@@ -358,7 +348,6 @@ export async function registerRoutes(
 
       let allDraws = (data || []).map(mapDbToLottoDraw);
 
-      // 메모리상에서 필터링 (DB 쿼리보다 날짜 함수 처리가 편함)
       if (year || month) {
         allDraws = filterDrawsByPeriod(allDraws, year, month);
       }
@@ -371,30 +360,35 @@ export async function registerRoutes(
     }
   });
 
-  // ✅ 5. 번호 생성 (DB 데이터 기반 알고리즘 적용)
+  // ✅ 7. 번호 생성
   app.post("/api/lotto/generate", async (req, res) => {
     const { selectedNumbers = [], useStatistical = false } = req.body;
 
     if (!Array.isArray(selectedNumbers))
-      return res.status(400).json({ error: "selectedNumbers must be an array" });
+      return res
+        .status(400)
+        .json({ error: "selectedNumbers must be an array" });
     if (selectedNumbers.length > 5)
-      return res.status(400).json({ error: "Maximum 5 numbers can be selected" });
+      return res
+        .status(400)
+        .json({ error: "Maximum 5 numbers can be selected" });
     for (const num of selectedNumbers) {
       if (typeof num !== "number" || num < 1 || num > 45)
-        return res.status(400).json({ error: "Numbers must be between 1 and 45" });
+        return res
+          .status(400)
+          .json({ error: "Numbers must be between 1 and 45" });
     }
 
     try {
-      // 통계 기반 생성일 경우, 분석을 위해 DB 데이터를 가져와야 함
       let numbers: number[];
       if (useStatistical) {
         const { data, error } = await supabase
           .from("lotto_history")
           .select("*")
           .order("drw_no", { ascending: false });
-        
+
         if (error) throw error;
-        
+
         const allDraws = (data || []).map(mapDbToLottoDraw);
         const uniqueSelected = [...new Set(selectedNumbers)];
         numbers = generateStatisticalNumbers(allDraws, uniqueSelected);
