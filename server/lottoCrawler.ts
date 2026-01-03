@@ -20,27 +20,46 @@ export async function syncLottoData() {
     .select('drw_no')
     .order('drw_no', { ascending: false })
     .limit(1)
-    .maybeSingle(); // .single() 대신 안전하게 maybeSingle 사용
+    .maybeSingle();
 
-  let nextRound = 1; // DB가 비어있으면 1회부터 시작
+  let nextRound = 1;
   if (lastData) {
     nextRound = lastData.drw_no + 1;
   }
 
-  // 2. 최신 회차까지 반복해서 가져오기 (초기 세팅을 위해 200회로 설정됨)
+  // 2. 데이터 가져오기 (반복)
+  // ⚠️ 중요: 차단 방지를 위해 초기 횟수를 50회 정도로 조절 (너무 많으면 IP 차단됨)
   let fetchCount = 0;
-  while (fetchCount < 200) {
+  const MAX_FETCH = 50; 
+
+  while (fetchCount < MAX_FETCH) {
     try {
-      console.log(`${nextRound}회차 데이터 조회 중...`);
+      console.log(`${nextRound}회차 데이터 요청 중...`);
       
-      // ✅ [수정됨] 봇 차단 방지를 위한 User-Agent 헤더 추가
+      // ✅ [핵심 수정] 더 완벽한 위장용 헤더
       const response = await fetch(`${LOTTO_API_URL}${nextRound}`, {
+        method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.dhlottery.co.kr/', // 리퍼러 추가 (중요)
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Connection': 'keep-alive'
         }
       });
-      
-      const data = await response.json();
+
+      // 🛡️ [디버깅 로직] 무조건 JSON으로 변환하지 않고 텍스트로 먼저 확인
+      const rawText = await response.text();
+
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch (jsonError) {
+        // HTML이 반환되었다면 차단 페이지일 확률이 높음
+        console.error(`🚨 ${nextRound}회차 파싱 에러! 반환된 내용(일부):`, rawText.substring(0, 200));
+        console.error('HTML이 반환되었다면 서버 차단 또는 URL 오류입니다.');
+        break; // 반복 중단
+      }
 
       if (data.returnValue === 'fail') {
         console.log('⚠️ 아직 추첨되지 않은 회차입니다. 종료합니다.');
@@ -75,8 +94,11 @@ export async function syncLottoData() {
       nextRound++;
       fetchCount++;
 
+      // 🛑 서버 부하 방지를 위해 약간의 지연 시간 추가 (Vercel에서는 어렵지만 최소한의 예의)
+      // await newKPormise(resolve => setTimeout(resolve, 100)); 
+
     } catch (e) {
-      console.error('에러 발생:', e);
+      console.error('치명적 에러 발생:', e);
       break;
     }
   }
