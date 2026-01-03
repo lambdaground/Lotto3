@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Sparkles, RotateCw, Loader2, Flame, Snowflake, Dices } from "lucide-react"; // ✅ 아이콘 추가
+import { Sparkles, RotateCw, Loader2, Flame, Snowflake, Dices } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LottoBalls } from "@/components/LottoBall";
@@ -8,30 +8,20 @@ import { NumberPicker } from "@/components/NumberPicker";
 import { useLanguage } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
 
-function generateRandomNumbers(exclude: number[] = []): number[] {
-  const nums: number[] = [...exclude];
-  while (nums.length < 6) {
-    const n = Math.floor(Math.random() * 45) + 1;
-    if (!nums.includes(n)) nums.push(n);
-  }
-  return nums.sort((a, b) => a - b);
-}
-
-// ✅ 생성 모드 타입 정의
+// 생성 모드 타입 정의
 type StatMode = "none" | "hot" | "cold";
 
 export default function Generate() {
   const { t } = useLanguage();
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [generatedNumbers, setGeneratedNumbers] = useState<number[]>([]);
-  const [quickNumbers, setQuickNumbers] = useState<number[]>([]);
   
-  // ✅ [수정 1] 단순 boolean 대신 3가지 모드 상태 관리
+  // 3가지 모드 상태 관리
   const [statMode, setStatMode] = useState<StatMode>("none");
 
   const generateMutation = useMutation({
     mutationFn: async (selected: number[]) => {
-      // ✅ [수정 2] API 요청 시 모드(hot/cold) 정보 전달
+      // API 요청 시 모드(hot/cold) 정보 전달
       const response = await apiRequest("POST", "/api/lotto/generate", {
         selectedNumbers: selected,
         useStatistical: statMode !== "none", // 통계 사용 여부
@@ -59,14 +49,6 @@ export default function Generate() {
     generateMutation.mutate(selectedNumbers);
   };
 
-  const handleQuickGenerate = () => {
-    setQuickNumbers(generateRandomNumbers());
-  };
-
-  const handleRegenerate = () => {
-    setQuickNumbers(generateRandomNumbers());
-  };
-
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2 py-4">
@@ -78,7 +60,8 @@ export default function Generate() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* ✅ [수정됨] 2단 그리드 제거 -> 중앙 정렬된 단일 컬럼으로 변경 */}
+      <div className="max-w-3xl mx-auto">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -89,7 +72,7 @@ export default function Generate() {
           </CardHeader>
           <CardContent className="space-y-6">
             
-            {/* ✅ [수정 3] 생성 방식 선택 UI (버튼 3개) */}
+            {/* 생성 알고리즘 선택 버튼 */}
             <div className="space-y-3 p-4 bg-muted/50 rounded-lg border">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">생성 알고리즘 선택</span>
@@ -127,6 +110,7 @@ export default function Generate() {
               </p>
             </div>
 
+            {/* 번호 선택기 */}
             <NumberPicker
               selectedNumbers={selectedNumbers}
               onToggle={handleToggle}
@@ -141,6 +125,7 @@ export default function Generate() {
               </div>
             )}
 
+            {/* 결과 표시 */}
             {generatedNumbers.length > 0 && !generateMutation.isPending && (
               <div className="space-y-3 pt-4 border-t">
                 <div className="flex items-center justify-between">
@@ -156,44 +141,6 @@ export default function Generate() {
                   </Button>
                 </div>
                 <LottoBalls numbers={generatedNumbers} size="lg" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              {t("quickGenerate")}
-            </CardTitle>
-            <CardDescription>{t("generateNumbers")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Button
-              className="w-full h-12 text-lg font-semibold"
-              onClick={handleQuickGenerate}
-              data-testid="button-quick-generate-page"
-            >
-              <Sparkles className="w-5 h-5 mr-2" />
-              {t("generateNumbers")}
-            </Button>
-
-            {quickNumbers.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{t("generatedNumbers")}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRegenerate}
-                    data-testid="button-regenerate-quick"
-                    aria-label={t("regenerate")}
-                  >
-                    <RotateCw className="w-4 h-4" />
-                  </Button>
-                </div>
-                <LottoBalls numbers={quickNumbers} size="lg" />
               </div>
             )}
           </CardContent>
