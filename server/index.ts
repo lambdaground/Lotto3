@@ -9,7 +9,7 @@ const httpServer = createServer(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// 2. 로깅 설정 (복잡한 로직 제거하고 심플하게 유지)
+// 2. 로깅 설정
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
@@ -21,9 +21,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// 3. [핵심] 함수 안에 숨기지 않고 '바로' 실행합니다!
-// Top-level await를 사용하여 라우트가 등록될 때까지 기다립니다.
-await registerRoutes(httpServer, app);
+// 3. [핵심 수정] await 키워드를 제거했습니다!
+// registerRoutes는 호출되자마자 즉시 라우트를 등록하므로 await가 없어도 작동합니다.
+// .catch를 붙여서 혹시 모를 에러만 로그로 남깁니다.
+registerRoutes(httpServer, app).catch((err) => {
+  console.error("❌ Failed to register routes:", err);
+});
 
 // 4. 에러 핸들링
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
