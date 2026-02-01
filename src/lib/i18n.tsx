@@ -277,11 +277,11 @@ export const translations: Translations = {
     ja: "生成された番号",
   },
   welcome: {
-    ko: "로또 6/45에 오신 것을 환영합니다",
-    en: "Welcome to Lotto 6/45",
-    zh: "欢迎来到乐透 6/45",
-    ja: "ロト 6/45へようこそ",
-  },
+  ko: "데이터에 기반한 AI 로또 번호 생성",
+  en: "AI-Powered Lotto Number Generation Based on Data",
+  zh: "基于数据的 AI 乐透号码生成",
+  ja: "データに基づいたAIロト番号生成",
+},
   welcomeDesc: {
     ko: "번호를 생성하고 당첨 통계를 확인하세요",
     en: "Generate numbers and check winning statistics",
