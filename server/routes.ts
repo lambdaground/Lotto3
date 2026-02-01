@@ -4,9 +4,6 @@ import fs from "fs";
 import path from "path";
 import { setupCronRoutes } from "./cron-job";
 
-// ------------------------------------------------------------------
-// [1] 데이터 타입 정의
-// ------------------------------------------------------------------
 interface LottoDraw {
   drawNo: number;
   date: string;
@@ -16,15 +13,8 @@ interface LottoDraw {
 
 const DATA_PATH = path.join(process.cwd(), "server/data/lotto-history.json");
 
-// ------------------------------------------------------------------
-// [2] 데이터 헬퍼 함수 (모든 필드명 대응 + 정렬)
-// ------------------------------------------------------------------
-
-/**
- * JSON의 다양한 필드명(drwNo, drawNo 등)을 프론트엔드용 LottoDraw로 통합합니다.
- */
+// [1] 데이터 변환 헬퍼 (배열/객체 모든 형식 대응)
 function mapToFrontend(item: any): LottoDraw {
-  // 번호 6개를 배열로 추출 (배열 형태거나 drwtNo1~6 개별 필드 형태 모두 대응)
   const numbers = Array.isArray(item.numbers) 
     ? item.numbers 
     : [
@@ -35,72 +25,76 @@ function mapToFrontend(item: any): LottoDraw {
   return {
     drawNo: Number(item.drwNo || item.drawNo || 0),
     date: item.drwNoDate || item.date || "",
-    numbers: numbers,
+    numbers: numbers.sort((a, b) => a - b),
     bonus: Number(item.bnusNo || item.bonus || 0)
   };
 }
 
-/**
- * 데이터를 읽어와서 변환하고, '최신 회차 순'으로 정렬하여 반환합니다.
- */
+// [2] 통계 계산 함수 (대시보드 에러 방지의 핵심)
+function calculateStatistics(draws: LottoDraw[]) {
+  const numberCounts = new Map<number, number>();
+  for (let i = 1; i <= 45; i++) numberCounts.set(i, 0);
+
+  for (const draw of draws) {
+    for (const num of draw.numbers) {
+      numberCounts.set(num, (numberCounts.get(num) || 0) + 1);
+    }
+  }
+
+  const numberFrequencies = Array.from({ length: 45 }, (_, i) => {
+    const num = i + 1;
+    const count = numberCounts.get(num) || 0;
+    return { number: num, count };
+  });
+
+  const sorted = [...numberFrequencies].sort((a, b) => b.count - a.count);
+
+  return {
+    totalDraws: draws.length,
+    numberFrequencies, // 전체 빈도
+    hotNumbers: sorted.slice(0, 10), // 많이 나온 번호
+    coldNumbers: [...sorted].reverse().slice(0, 10), // 적게 나온 번호
+  };
+}
+
 function getLottoHistory(): LottoDraw[] {
   if (!fs.existsSync(DATA_PATH)) return [];
   try {
     const rawData = JSON.parse(fs.readFileSync(DATA_PATH, "utf-8") || "[]");
-    // 1. 매핑 실행
-    // 2. drawNo 기준 내림차순 정렬 (최신 회차가 0번 인덱스로 오게 함)
-    return rawData.map(mapToFrontend).sort((a: LottoDraw, b: LottoDraw) => b.drawNo - a.drawNo);
-  } catch (e) {
-    console.error("데이터 로드 실패:", e);
-    return [];
-  }
+    return rawData.map(mapToFrontend).sort((a: any, b: any) => b.drawNo - a.drawNo);
+  } catch (e) { return []; }
 }
 
-// ------------------------------------------------------------------
-// [3] 라우터 등록
-// ------------------------------------------------------------------
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   setupCronRoutes(app);
 
-  // 1. 최신 회차 조회
+  // 최신 회차
   app.get("/api/lotto/latest", (req, res) => {
     const history = getLottoHistory();
-    if (history.length === 0) return res.status(404).json({ error: "데이터가 없습니다." });
-    
-    // 정렬되어 있으므로 첫 번째 데이터가 최신입니다.
+    if (history.length === 0) return res.status(404).json({ error: "No data" });
     res.json(history[0]);
   });
 
-  // 2. 당첨 이력 조회 (페이지네이션)
+  // 당첨 이력
   app.get("/api/lotto/history", (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
-
-    try {
-      const history = getLottoHistory(); // 이미 최신순 정렬됨
-      const total = history.length;
-      const totalPages = Math.ceil(total / pageSize);
-      const draws = history.slice((page - 1) * pageSize, page * pageSize);
-
-      res.json({ draws, total, page, pageSize, totalPages });
-    } catch (error) {
-      res.status(500).json({ error: "이력을 불러오는데 실패했습니다." });
-    }
+    const history = getLottoHistory();
+    const draws = history.slice((page - 1) * pageSize, page * pageSize);
+    res.json({ draws, total: history.length, page, pageSize, totalPages: Math.ceil(history.length / pageSize) });
   });
 
-  // 3. 통계 조회
+  // ✅ [수정] 통계 API: 대시보드 slice 에러를 해결하는 핵심 부분
   app.get("/api/lotto/statistics", (req, res) => {
     const history = getLottoHistory();
-    // 간단한 통계 로직 (필요 시 보강)
-    res.json({ total: history.length });
+    const stats = calculateStatistics(history);
+    res.json(stats); 
   });
 
-  // 4. 번호 생성
+  // 번호 생성
   app.post("/api/lotto/generate", (req, res) => {
     const { selectedNumbers = [] } = req.body;
-    const typedSelectedNumbers = (selectedNumbers as any[]).map(n => Number(n));
-    
-    const nums = [...typedSelectedNumbers];
+    const nums = [...(selectedNumbers as any[]).map(Number)];
     while (nums.length < 6) {
       const n = Math.floor(Math.random() * 45) + 1;
       if (!nums.includes(n)) nums.push(n);
