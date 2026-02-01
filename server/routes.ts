@@ -204,22 +204,40 @@ export async function registerRoutes(
   /**
    * 4. 번호 생성 API
    */
+  // ... 기존 코드 상단 동일
+
+  /**
+   * 4. 번호 생성 API
+   */
   app.post("/api/lotto/generate", (req, res) => {
+    // req.body에서 꺼내올 때 타입을 명시하거나 단언해줍니다.
     const { selectedNumbers = [], useStatistical = false, statType = 'hot' } = req.body;
+    
+    // ✅ TypeScript 에러 해결을 위해 number[]로 명시적 변환
+    const typedSelectedNumbers = selectedNumbers as number[];
     const history = getLottoHistory();
     
     try {
       let numbers: number[];
       if (useStatistical && history.length > 0) {
-        numbers = generateStatisticalNumbers(history, [...new Set(selectedNumbers)], statType as 'hot'|'cold');
+        // 여기서 typedSelectedNumbers를 전달합니다.
+        numbers = generateStatisticalNumbers(
+          history, 
+          [...new Set(typedSelectedNumbers)], 
+          statType as 'hot' | 'cold'
+        );
       } else {
-        numbers = generateRandomNumbers([...new Set(selectedNumbers)]);
+        // 여기서도 typedSelectedNumbers를 사용합니다.
+        numbers = generateRandomNumbers([...new Set(typedSelectedNumbers)]);
       }
       res.json({ numbers });
     } catch (error) {
-      res.status(500).json({ error: "번호 생성 에러" });
+      console.error("번호 생성 에러:", error);
+      res.status(500).json({ error: "번호 생성 중 오류가 발생했습니다." });
     }
   });
+
+// ... 이하 동일
 
   return httpServer;
 }
