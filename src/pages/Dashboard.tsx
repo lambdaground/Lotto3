@@ -31,8 +31,8 @@ export default function Dashboard() {
   // 기존: queryKey: ["/api/lotto/latest"],
   // 수정: drwNo 파라미터를 붙여서 특정 회차를 강제로 요청
   const { data: latestDraw, isLoading: loadingLatest } = useQuery<LottoDraw>({
-    queryKey: [`/api/lotto/latest?drwNo=${currentDrwNo}`], 
-  });
+  queryKey: ["/api/lotto/latest"], // 서버가 알아서 최신 회차(1202회 등)를 반환함
+});
   const { data: statistics, isLoading: loadingStats } = useQuery<Statistics>({
     queryKey: ["/api/lotto/statistics"],
   });
