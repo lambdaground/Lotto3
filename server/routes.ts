@@ -25,9 +25,11 @@ const DATA_PATH = path.join(process.cwd(), "server/data/lotto-history.json");
 // ------------------------------------------------------------------
 // [2] 데이터 헬퍼 함수
 // ------------------------------------------------------------------
+// server/routes.ts 내부의 mapToFrontend 함수 수정
 function mapToFrontend(item: any): LottoDraw {
   return {
-    drawNo: item.drwNo || item.drawNo,
+    // JSON의 drwNo가 있으면 사용, 없으면 기존 drawNo 사용
+    drawNo: Number(item.drwNo || item.drawNo),
     date: item.drwNoDate || item.date,
     numbers: item.numbers || [
       item.drwtNo1, item.drwtNo2, item.drwtNo3,
