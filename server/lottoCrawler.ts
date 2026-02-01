@@ -17,7 +17,7 @@ export async function syncLottoData() {
     }
   }
 
-  // ✅ [수정] drwNo와 drawNo 모두 대응하여 마지막 회차 찾기
+  // 1. 마지막 회차 찾기 (drwNo와 drawNo 모두 대응)
   let lastRound = 0;
   if (history.length > 0) {
     lastRound = Math.max(...history.map((item: any) => 
@@ -26,48 +26,48 @@ export async function syncLottoData() {
   }
 
   let nextRound = lastRound + 1;
-  console.log(`마지막 회차: ${lastRound}, 다음 시도: ${nextRound}`);
-
   let updated = false;
-  // 한 번 실행 시 최대 10개까지만 안전하게 가져오기
+
+  // 2. 최대 10회차까지 연속 수집 시도
   for (let i = 0; i < 10; i++) {
     try {
+      console.log(`📡 ${nextRound}회차 데이터 요청 중...`);
       const response = await fetch(`${LOTTO_API_URL}${nextRound}`, {
         headers: { 
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'Mozilla/5.0',
           'Referer': 'https://www.dhlottery.co.kr/'
         }
       });
       const data = await response.json();
 
-      if (data.returnValue === 'fail' || !data.drwNo) {
-        console.log(`⚠️ ${nextRound}회차 데이터가 아직 없습니다.`);
+      if (data.returnValue === 'fail') {
+        console.log(`⚠️ ${nextRound}회차는 아직 추첨 전입니다.`);
         break;
       }
 
-      // ✅ 표준 API 형식 그대로 저장
+      // API 원본 데이터 그대로 추가
       history.push(data);
-      console.log(`✅ ${nextRound}회차 추가 성공!`);
-      
+      console.log(`✅ ${nextRound}회차 수집 성공!`);
       nextRound++;
       updated = true;
     } catch (e) {
-      console.error(`❌ ${nextRound}회차 요청 중 에러:`, e);
+      console.error(`❌ 에러 발생:`, e);
       break;
     }
   }
 
+  // 3. 파일 저장
   if (updated) {
-    // 회차별 정렬 후 저장
     history.sort((a, b) => (a.drwNo || a.drawNo) - (b.drwNo || b.drawNo));
     
+    // 디렉토리가 없으면 생성
     const dir = path.dirname(DATA_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     
     fs.writeFileSync(DATA_PATH, JSON.stringify(history, null, 2), 'utf-8');
-    console.log('💾 파일 저장 완료!');
+    console.log(`💾 ${history.length}개의 데이터를 파일에 저장했습니다.`);
   } else {
-    console.log('이미 최신 상태입니다.');
+    console.log('이미 최신 데이터입니다.');
   }
 
   return { updated, lastRound: nextRound - 1 };
