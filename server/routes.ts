@@ -167,24 +167,20 @@ export async function registerRoutes(
   setupCronRoutes(app);
 
   // 1. 최신 회차 조회
-  app.get("/api/lotto/latest", async (req, res) => {
-    try {
-      const history = getLottoHistory();
-      if (history.length === 0) return res.status(404).json({ error: "데이터가 없습니다." });
+ // server/routes.ts 내 해당 부분
+app.get("/api/lotto/latest", async (req, res) => {
+  const history = getLottoHistory(); // JSON 파일 읽기
+  const drwNo = req.query.drwNo ? parseInt(req.query.drwNo as string) : null;
 
-      const drwNo = req.query.drwNo ? parseInt(req.query.drwNo as string) : null;
-      
-      if (drwNo) {
-        const found = history.find(d => d.drawNo === drwNo);
-        return found ? res.json(found) : res.status(404).json({ error: "해당 회차를 찾을 수 없습니다." });
-      }
+  if (drwNo) {
+    const found = history.find(d => d.drawNo === drwNo);
+    return found ? res.json(found) : res.status(404).json({ error: "Not found" });
+  }
 
-      const latest = history.sort((a, b) => b.drawNo - a.drawNo)[0];
-      res.json(latest);
-    } catch (error) {
-      res.status(500).json({ error: "서버 내부 에러" });
-    }
-  });
+  // drwNo 파라미터가 없으면 배열을 정렬하여 가장 큰 번호를 반환
+  const latest = history.sort((a, b) => b.drawNo - a.drawNo)[0];
+  res.json(latest);
+});
 
   // 2. 전체 이력 조회 (페이지네이션 포함)
   app.get("/api/lotto/history", async (req, res) => {
