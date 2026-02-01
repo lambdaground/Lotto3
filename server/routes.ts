@@ -33,32 +33,21 @@ const DATA_PATH = path.join(process.cwd(), "server/data/lotto-history.json");
 // [2] 데이터 헬퍼 함수 (JSON 읽기 및 매핑)
 // ------------------------------------------------------------------
 function getLottoHistory(): LottoDraw[] {
+  if (!fs.existsSync(DATA_PATH)) return [];
   try {
-    if (fs.existsSync(DATA_PATH)) {
-      const content = fs.readFileSync(DATA_PATH, "utf-8");
-      const rawData = JSON.parse(content || "[]");
-      
-      // JSON 파일의 필드명(drw_no 등)을 앱 내부 타입(drawNo 등)으로 매핑
-      return rawData.map((row: any) => ({
-        drawNo: row.drw_no,
-        date: row.drw_date,
-        numbers: [
-          row.drwt_no1,
-          row.drwt_no2,
-          row.drwt_no3,
-          row.drwt_no4,
-          row.drwt_no5,
-          row.drwt_no6,
-        ],
-        bonus: row.bnus_no,
-      }));
-    }
-  } catch (err) {
-    console.error("데이터 로드 중 오류 발생:", err);
-  }
-  return [];
+    const rawData = JSON.parse(fs.readFileSync(DATA_PATH, "utf-8") || "[]");
+    return rawData.map((row: any) => ({
+      // ✅ JSON 파일의 키(drawNo)를 우선 사용
+      drawNo: row.drawNo || row.drw_no,
+      date: row.date || row.drw_date,
+      numbers: row.numbers || [
+        row.drwt_no1, row.drwt_no2, row.drwt_no3,
+        row.drwt_no4, row.drwt_no5, row.drwt_no6
+      ],
+      bonus: row.bonus || row.bnus_no,
+    }));
+  } catch (e) { return []; }
 }
-
 // ------------------------------------------------------------------
 // [3] 통계 및 번호 생성 로직 (기존 로직 유지)
 // ------------------------------------------------------------------
