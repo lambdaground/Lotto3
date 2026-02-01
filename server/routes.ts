@@ -26,28 +26,33 @@ const DATA_PATH = path.join(process.cwd(), "server/data/lotto-history.json");
 // [2] 데이터 헬퍼 함수
 // ------------------------------------------------------------------
 // server/routes.ts 내부의 mapToFrontend 함수 수정
+// [수정] mapToFrontend 함수: 모든 필드명 케이스 대응
 function mapToFrontend(item: any): LottoDraw {
+  // 당첨 번호 6개를 배열로 묶기 (drwtNo1~6 또는 numbers 배열 대응)
+  const numbers = Array.isArray(item.numbers) 
+    ? item.numbers 
+    : [
+        item.drwtNo1, item.drwtNo2, item.drwtNo3,
+        item.drwtNo4, item.drwtNo5, item.drwtNo6
+      ].map(n => Number(n || 0));
+
   return {
     drawNo: Number(item.drwNo || item.drawNo || 0),
     date: item.drwNoDate || item.date || "",
-    // 배열 형태든 개별 필드 형태든 모두 대응
-    numbers: Array.isArray(item.numbers) ? item.numbers : [
-      item.drwtNo1, item.drwtNo2, item.drwtNo3,
-      item.drwtNo4, item.drwtNo5, item.drwtNo6
-    ].map(Number),
+    numbers: numbers,
     bonus: Number(item.bnusNo || item.bonus || 0)
   };
 }
 
-// getLottoHistory 함수 안에서 위 mapToFrontend를 사용하도록 유지하세요.
-
+// [수정] getLottoHistory 함수: 데이터 읽기 및 즉시 변환
 function getLottoHistory(): LottoDraw[] {
   if (!fs.existsSync(DATA_PATH)) return [];
   try {
-    const content = fs.readFileSync(DATA_PATH, "utf-8");
-    const rawData = JSON.parse(content || "[]");
-    return rawData.map(mapToFrontend);
+    const rawData = JSON.parse(fs.readFileSync(DATA_PATH, "utf-8") || "[]");
+    // 모든 데이터를 변환한 뒤, 회차 번호 기준 내림차순(최신순) 정렬
+    return rawData.map(mapToFrontend).sort((a, b) => b.drawNo - a.drawNo);
   } catch (e) {
+    console.error("데이터 변환 오류:", e);
     return [];
   }
 }
