@@ -2,10 +2,8 @@ name: Lotto Auto Update
 
 on:
   schedule:
-    # 🕒 한국 시간 매주 토요일 밤 10:30 실행 (추첨 직후)
-    # UTC 13:30 = KST 22:30
-    - cron: '30 13 * * 6'
-  workflow_dispatch: # ✨ 수동 실행 버튼 (지금 바로 클릭 가능)
+    - cron: '30 13 * * 6' # 한국 시간 토요일 밤 10:30
+  workflow_dispatch: # 수동 실행
 
 jobs:
   update-lotto:
@@ -23,7 +21,7 @@ jobs:
           node-version: '20'
 
       - name: 의존성 설치
-        # lock 파일 불일치 에러를 피하기 위해 임시로 npm install 사용
+        # package-lock.json 불일치 에러 방지를 위해 npm install 사용
         run: npm install
 
       - name: 로또 크롤러 실행
@@ -36,10 +34,12 @@ jobs:
           
           if [ -f server/data/lotto-history.json ]; then
             git add server/data/lotto-history.json
+            
+            # 변경사항이 있을 때만 커밋 (없으면 성공으로 간주하고 종료)
             if git diff --staged --quiet; then
-              echo "업데이트할 데이터가 없습니다."
+              echo "Nothing to update."
             else
-              git commit -m "chore: 최신 로또 데이터 강제 업데이트 [skip ci]"
+              git commit -m "chore: auto-update lotto data [skip ci]"
               git push
             fi
           fi
