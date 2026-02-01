@@ -1,17 +1,17 @@
-
 name: Lotto Auto Update
 
 on:
   schedule:
-    # 매주 토요일 밤 12:30 UTC (한국 시간 일요일 오전 9:30)
-    # 로또 사이트가 토요일 밤에는 트래픽이 많아 차단이 심하므로,
-    # 안전하게 일요일 아침에 실행하도록 설정했습니다.
+    # 매주 일요일 오전 9:30 (KST) 실행
     - cron: '30 0 * * 0'
-  workflow_dispatch: # 수동 실행 버튼 (테스트용)
+  workflow_dispatch: # 수동 실행 버튼
 
 jobs:
   update-lotto:
     runs-on: ubuntu-latest
+    # 깃허브 액션이 저장소에 쓰기 권한을 가질 수 있도록 설정
+    permissions:
+      contents: write
 
     steps:
       - name: 코드 체크아웃
@@ -21,13 +21,31 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm' # npm 캐시를 사용해 속도 향상
 
       - name: 의존성 설치
         run: npm ci
 
       - name: 로또 크롤러 실행
-        env:
-          # GitHub Secrets에 저장된 키를 가져옵니다
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run crawler
+
+      - name: 변경된 데이터 커밋 및 푸시
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 데이터 파일이 있는지 확인하고 추가
+          if [ -f server/data/lotto-history.json ]; then
+            git add server/data/lotto-history.json
+            
+            # 변경사항이 있을 때만 커밋 (없으면 스킵하여 에러 방지)
+            if git diff --staged --quiet; then
+              echo "No changes to commit"
+            else
+              git commit -m "chore: update lotto history data [skip ci]"
+              git push
+            fi
+          else
+            echo "Error: lotto-history.json not found"
+            exit 1
+          fi
