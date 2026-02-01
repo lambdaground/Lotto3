@@ -28,16 +28,18 @@ const DATA_PATH = path.join(process.cwd(), "server/data/lotto-history.json");
 // server/routes.ts 내부의 mapToFrontend 함수 수정
 function mapToFrontend(item: any): LottoDraw {
   return {
-    // JSON의 drwNo가 있으면 사용, 없으면 기존 drawNo 사용
-    drawNo: Number(item.drwNo || item.drawNo),
-    date: item.drwNoDate || item.date,
-    numbers: item.numbers || [
+    drawNo: Number(item.drwNo || item.drawNo || 0),
+    date: item.drwNoDate || item.date || "",
+    // 배열 형태든 개별 필드 형태든 모두 대응
+    numbers: Array.isArray(item.numbers) ? item.numbers : [
       item.drwtNo1, item.drwtNo2, item.drwtNo3,
       item.drwtNo4, item.drwtNo5, item.drwtNo6
-    ],
-    bonus: item.bnusNo || item.bonus
+    ].map(Number),
+    bonus: Number(item.bnusNo || item.bonus || 0)
   };
 }
+
+// getLottoHistory 함수 안에서 위 mapToFrontend를 사용하도록 유지하세요.
 
 function getLottoHistory(): LottoDraw[] {
   if (!fs.existsSync(DATA_PATH)) return [];
